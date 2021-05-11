@@ -1,0 +1,54 @@
+function [seed_array, seed_array_mask] = seed_generation_module(valid_seg, target_wigner)
+%% this file will generate an iteration seed for each neuron.
+%  input 3D valid seg valid_seg
+%  
+%  last update: 5/11/2021. YZ
+
+largepsf((img_r+1)/2-(psf_r-1)/2:(img_r+1)/2+(psf_r-1)/2,(img_c+1)/2-(psf_r-1)/2:(img_c+1)/2+(psf_r-1)/2,:) ...
+    = squeeze(tmp);
+
+%% prepare the multiscale psf
+% do multiscale compensation
+if tt < 51 || tt > 151
+    psf_z = 2*psf_z;
+elseif tt == 51 || tt == 151
+    psf_z = 1.5*psf_z;
+end
+
+
+psf_z = psf_z(276:end-275,276:end-275,:,:,:);
+
+%% forward projection
+for j = 1 : length(valid_seg)
+    for i = 1 : length(target_wigner)
+        curr_u = target_wigner(i).u;
+        curr_v = target_wigner(i).u;
+
+
+        tmp = gpuArray(psf_z(:,:, curr_u, curr_v,:));%%uv?psf???phase space
+        FFTPSF = fftn(flip(tmp,3));
+        tmptmp = fftshift(fftshift(Xguess,1),2);%%Xguess????volume
+        HXguess =sum((fftn(tmptmp).*FFTPSF),3)./size(psf_z,5);
+        HXguess=abs(ifftn(HXguess)); % in large size.
+
+        % proper downsampling?
+        HXguess_d = HXguess; % 2d
+
+        % record
+        curr_seed = HXguess_d;
+        curr_seed_mask = curr_seed > 0.1 * max(curr_seed(:));
+
+        seed_array{j, i} = curr_seed;
+        seed_array_mask{j, i} = curr_seed_mask;
+
+
+        % TOD
+    end
+end
+%%
+
+
+%% map to different palces23
+
+
+end
