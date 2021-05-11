@@ -4,5 +4,5 @@
 
 
 # v0.1
-# include DAO reconstructions (without phase update), morphology segmentations, background rejections from marginal wigner, and main demixing from selected wigners
+### include DAO reconstructions (without phase update), morphology segmentations, background rejections from marginal wigner, and main demixing from selected wigners
 
