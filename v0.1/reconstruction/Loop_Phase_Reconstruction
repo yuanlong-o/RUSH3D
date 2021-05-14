@@ -1,0 +1,457 @@
+clc
+clear
+close all
+gpuDevice(1);
+addpath('Z:\GYD\Code/');
+addpath('Z:\GYD\Code\Util');
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%Only for local region of Single Lens%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Init PATH
+InitPsfpath = 'Z:\GYD\PSF_大圆孔_Data_墙壁_解卷积测试\psf\psf_circ_big_1X';
+WDFname = 'Z:\GYD\PublishedData\Figure2\qmsht\Realign_0514/part1.tif';
+Genpath = 'Z:\GYD\PublishedData\Figure2\qmsht_Recon\0514/part1_loop';
+%% Init Parameters
+ratio = 4;
+iter_times = 10;
+PSF_layer = 21;
+anglenum = 25;
+maxIter_Init = 5;
+maxIter_Loop = 3;
+Nshift = 15;
+Nnum = 15;
+para.list = 0;
+ps = 135;
+Phase_aberration = zeros(ps,ps,iter_times);
+aberration_iter = 0;
+M = 1;
+para.block_num = 0;
+%% Load Init Variables
+load([InitPsfpath,'\psf_dense_layer_',num2str(PSF_layer),'.mat']);
+psf = psf_z;
+for i = 1:Nnum^2
+    m = ceil(i/Nnum);
+    n = mod(i,Nnum);
+    if n == 0
+        n = Nnum;
+    end
+    disp(['u = ', num2str(m), ', v = ', num2str(n), 'has been read!']);
+    tmp = double(imread(WDFname,i));
+    tmp(tmp<0)=0;
+    if i == 1
+        WDF = zeros(size(tmp,1),size(tmp,2),Nnum,Nnum);
+    end
+    WDF(:,:,m,n) = tmp;
+end
+WDF = WDF./max(WDF(:));
+if Nshift ~= Nnum
+    WDF_resize = imresize(WDF,[floor(size(WDF,1)/Nshift*Nnum),floor(size(WDF,2)/Nshift*Nnum)],'cubic');
+else
+    WDF_resize = WDF;
+end
+%% Iterations
+for Pupil_iteration = 1:1:iter_times
+    disp(['1Step -- Iter',num2str(Pupil_iteration),'/',num2str(iter_times),':Reconstruction.']);
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    savefolder_recon = [Genpath,'/Iterations_',num2str(Pupil_iteration),'/Recon_',num2str(PSF_layer),'/'];
+    mkdir(savefolder_recon);
+    if Pupil_iteration ~= 1
+        clear psf;
+        load([PSFsavepathgen,'psf_pupil',num2str(Pupil_iteration),'_layer_2.mat']);
+        psf = psf_z;
+        maxIter = maxIter_Loop;
+    else
+        maxIter = maxIter_Init;
+    end
+    Xguess=ones(size(WDF_resize,1),size(WDF_resize,2),size(psf_z,5));
+    Xguess=Xguess./sum(Xguess(:)).*sum(Xguess(:))./(size(Xguess,3)*size(Xguess,4));
+    Xguess = FastDeconvolution_allAngle_15_def(maxIter,Xguess,WDF_resize,psf,0,savefolder_recon,0,1,anglenum,para,-1);
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    %% Pupil Reconstruct
+    disp(['2Step -- Iter',num2str(Pupil_iteration),'/',num2str(iter_times),':Phase Generation.']);
+    savefolder_Phase = [Genpath,'/Iterations_',num2str(Pupil_iteration),'/Phase_',num2str(PSF_layer),'/'];
+    mkdir(savefolder_Phase);
+    Mapsavename = [savefolder_recon,'map_wavshape_test_scan_ite',num2str(maxIter),'_block_0.mat'];
+    load(Mapsavename);
+    weight1=ones(15,15,2);
+    for u=1:15
+        for v=1:15
+            if ((u-8)^2+(v-8)^2) > anglenum ||((u-8)^2+(v-8)^2) <= -1
+                weight1(u,v,:)=0;
+            end
+        end
+    end
+    shift_kernel = squeeze(map_wavshape).*weight1;
+    waveShape = -shift_kernel;
+    waveShape(abs(waveShape)>1000) = 0;
+    [Nnum,~] = size(waveShape);
+    expand = 5;
+    waveShape_expand = zeros(expand*Nnum,expand*Nnum,2);
+    waveShape_expand(:,:,1)=imresize(waveShape(:,:,1),[expand*Nnum,expand*Nnum]);
+    waveShape_expand(:,:,2)=imresize(waveShape(:,:,2),[expand*Nnum,expand*Nnum]);
+    [xx,yy] = meshgrid(-(expand*size(waveShape,1)-1)/2:(expand*size(waveShape,1)-1)/2,...
+        -(expand*size(waveShape,1)-1)/2:(expand*size(waveShape,1)-1)/2);
+    r_actual = sqrt(anglenum)*2+1;
+    mask = xx.^2+yy.^2 <= ((expand*r_actual/2).^2);
+    waveShape_expand = waveShape_expand.*mask;
+    waveShape_expand = waveShape_expand((end+1)/2-round(expand*r_actual/2)+1:(end+1)/2+round(expand*r_actual/2)-1,...
+        (end+1)/2-round(expand*r_actual/2)+1:(end+1)/2+round(expand*r_actual/2)-1,:);
+    [x1,y1] = meshgrid(1:size(waveShape_expand,1),1:size(waveShape_expand,2));
+    [x2,y2] = meshgrid(linspace(1,size(waveShape_expand,1),ps),linspace(1,size(waveShape_expand,1),ps));
+    calcu_dephase = zeros(ps,ps,2);
+    calcu_dephase(:,:,1)  = interp2(x1,y1,waveShape_expand(:,:,1),x2,y2,'nearest');
+    calcu_dephase(:,:,2)  = interp2(x1,y1,waveShape_expand(:,:,2),x2,y2,'nearest');
+    maxIte = 1000;
+    calcu_phase = intercircle_zy_v2(calcu_dephase,maxIte);
+    [rr,cc] = size(calcu_phase);
+    ra = (rr-1)/2;
+    [xx,yy]=meshgrid([-ra:ra],[-ra:ra]);
+    mask = xx.^2+yy.^2<=(ra^2);
+    calcu_phase_k = ratio*calcu_phase.*mask;
+    x=linspace(-1,1,size(calcu_phase_k,1));
+    y=linspace(-1,1,size(calcu_phase_k,2));
+    xy = [x;y];
+    a1=lsqcurvefit('SH',zeros(1,45),xy,calcu_phase_k);
+    calcu_phase_k=SH(a1,xy);
+    aber3 = calcu_phase_k;
+    save([savefolder_Phase,'pupil_ite',num2str(Pupil_iteration),'_ratio_',num2str(ratio),'.mat'],'calcu_phase_k','aber3','a1','ps','waveShape');
+    Phase_aberration(:,:,Pupil_iteration) = aber3;
+    aberration_iter = aberration_iter + aber3;
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    %% PSF Generation
+    disp(['3Step -- Iter',num2str(Pupil_iteration),'/',num2str(iter_times),':PSF Generation.']);
+    PSFsavepathgen = [Genpath,'/Iterations_',num2str(Pupil_iteration),'/PSF_',num2str(PSF_layer),'/'];    mkdir(PSFsavepathgen);
+    mkdir(PSFsavepathgen);
+    pupil_flag = 1;
+    block = 1;
+    modulate =1;
+    newfresnel = 0;
+    rms_ratio = 0;
+    ab_flag = 1;
+    MLPitch =   69*1e-6;
+    Nnum =      15;
+    OSR =       3;
+    n =         1;
+    NA =        1/20;
+    fml =       MLPitch/(2*NA);
+    lambda =    525*1e-9;
+    zmax =      20*1e-4;
+    zmin =      -20*1e-4;
+    zspacing =  20*1e-4;
+    Maxresolution = lambda/(2*NA);
+    zresolution = n*lambda/(NA^2);
+    pixelsize = MLPitch/Nnum;
+    eqtol = 1e-10;
+    k = 2*pi*n/lambda; %% k
+    k0 = 2*pi*1/lambda; %% k
+    d = fml;   %% optical distance between the microlens and the sensor
+    ftl = 50*1e-3;        %% focal length of tube lens
+    fobj = ftl/M;  %% focal length of objective lens
+    fnum_obj = M/(2*NA); %% f-number of objective lens (imaging-side)
+    fnum_ml = fml/MLPitch; %% f-number of micrl lens
+    pixelPitch = MLPitch/Nnum; %% pitch of virtual pixels
+    Minpixelnumber =  M*Maxresolution/pixelPitch;
+    FresnelNumber =  MLPitch^2/(d*lambda);
+    NA_ratio = fnum_obj/fnum_ml;
+    disp(['3Step -- Iter',num2str(Pupil_iteration),'/',num2str(iter_times),':']);
+    disp(['FresnelNumber = ', num2str(FresnelNumber), '!']);
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    %%%%%%%%%%%%% DEFINE OBJECT SPACE %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    if mod(Nnum,2)==0
+        error(['Nnum should be an odd number']);
+    end
+    
+    x1objspace = [0];
+    x2objspace = [0];
+    x3objspace = [zmin:zspacing:zmax]+1e-9; % offset
+    objspace = ones(length(x1objspace),length(x2objspace),length(x3objspace));
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    if mod(length(x3objspace),2) ==0
+        error(['The layer number should be an odd number!'])
+    end
+    middlelayer = floor(length(x3objspace)/2)+1;   % the middle layer axially
+    dz = x3objspace - x3objspace(middlelayer);
+    Camera.fobj = fobj;
+    Camera.objRad = fobj/fnum_obj/2;
+    Camera.Delta_ot = fobj + ftl;
+    Camera.ftl = ftl;
+    Camera.tube2mla = ftl;
+    Camera.fm = fml;
+    Camera.lensPitch = MLPitch;
+    Camera.mla2sensor = d;
+    save([PSFsavepathgen,'/antialiasing.mat'], 'Camera', 'dz', 'OSR');  
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    p3max = max(abs(x3objspace));
+    x1testspace = (pixelPitch/OSR)* [0:1: Nnum*OSR*20];
+    x2testspace = [0];
+    [psfLine] = calcPSFFT(p3max, fobj, NA, x1testspace, pixelPitch/OSR, lambda, d, M, n);  % compute the diffraction of object plane to native image plane
+    outArea = find(psfLine<1e-5);       % Note that the psfLine is just the half of the psf
+    if isempty(outArea)
+        error('Estimated PSF size exceeds the limit');
+    end
+    IMGSIZE_REF = ceil(outArea(1)/(OSR*Nnum));
+    %%%%%%%%%%%%%% OTHER SIMULATION PARAMETERS %%%%%%%%%%%%%%%%%%%%%%%
+    disp(['3Step -- Iter',num2str(Pupil_iteration),'/',num2str(iter_times),':']);
+    disp(['Size of PSF ~= ' num2str(IMGSIZE_REF) ' [microlens pitch]' ]);  % indicate that the psf size is smaller than IMGSIZE_REF microlens pitches
+    IMG_HALFWIDTH = max( Nnum*(IMGSIZE_REF + 1), 2*Nnum);  % Note the IMGSIZE_REF is the half number of psf
+    disp(['Size of IMAGE = ' num2str(IMG_HALFWIDTH*2*OSR+1) 'X' num2str(IMG_HALFWIDTH*2*OSR+1) '' ]);
+    if newfresnel == 1
+        x1space = (pixelPitch/OSR)*[-IMG_HALFWIDTH*OSR-1:1:IMG_HALFWIDTH*OSR+1];
+        x2space = (pixelPitch/OSR)*[-IMG_HALFWIDTH*OSR-1:1:IMG_HALFWIDTH*OSR+1];
+    else
+        x1space = (pixelPitch/OSR)*[-IMG_HALFWIDTH*OSR:1:IMG_HALFWIDTH*OSR];
+        x2space = (pixelPitch/OSR)*[-IMG_HALFWIDTH*OSR:1:IMG_HALFWIDTH*OSR];
+    end    
+    x1length = length(x1space);
+    x2length = length(x2space); 
+    x1MLspace = (pixelPitch/OSR)* [-(Nnum*OSR-1)/2 : 1 : (Nnum*OSR-1)/2];
+    x2MLspace = (pixelPitch/OSR)* [-(Nnum*OSR-1)/2 : 1 : (Nnum*OSR-1)/2];
+    x1MLdist = length(x1MLspace);
+    x2MLdist = length(x2MLspace);
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    %%%%%%%%%%%%%%%%%% FIND NON-ZERO POINTS %%%%%%%%%%%%%%%%%%%%%%%%%%
+    validpts = find(objspace>eqtol);
+    numpts = length(validpts);
+    [p1indALL p2indALL p3indALL] = ind2sub( size(objspace), validpts);
+    p1ALL = x1objspace(p1indALL)';
+    p2ALL = x2objspace(p2indALL)';
+    p3ALL = x3objspace(p3indALL)';
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%   
+    %%%%%%%%%%%%%%%%%%%%%%%% DEFINE ML ARRAY %%%%%%%%%%%%%%%%%%%%%%%%%
+    [MLARRAY,MLARRAYab] = calcML(fml, k0, x1MLspace, x2MLspace, x1space, x2space);   %%% caculate the diffraction
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%                   of native image plane to sensor plane   
+    %%%%%%%%%%%%%%%%%%%%%% Alocate Memory for storing PSFs %%%%%%%%%%%
+    LFpsfWAVE_STACK = zeros(x1length, x2length, numpts);
+    psfWAVE_STACK = zeros(x1length, x2length, numpts);
+    disp(['3Step -- Iter',num2str(Pupil_iteration),'/',num2str(iter_times),':']);
+    disp(['Start Calculating PSF...']);
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%   
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    %%%%%%% PROJECTION FROM SINGLE POINT %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    centerPT = ceil(length(x1space)/2);
+    halfWidth =  Nnum*(IMGSIZE_REF + 0 )*OSR;
+    centerArea = (  max((centerPT - halfWidth),1)   :   min((centerPT + halfWidth),length(x1space))     );
+    disp(['3Step -- Iter',num2str(Pupil_iteration),'/',num2str(iter_times),':']);
+    disp(['Computing PSFs (1/3)']);   % calculate psf of object plane to native image plane of all the depth
+    for eachpt=1:numpts
+        p1 = p1ALL(eachpt);
+        p2 = p2ALL(eachpt);
+        p3 = p3ALL(eachpt);
+        
+        IMGSIZE_REF_IL = ceil(IMGSIZE_REF*( abs(p3)/p3max));
+        halfWidth_IL =  max(Nnum*(IMGSIZE_REF_IL + 0 )*OSR, 2*Nnum*OSR);
+        centerArea_IL = (  max((centerPT - halfWidth_IL),1)   :   min((centerPT + halfWidth_IL),length(x1space))     );
+        disp(['3Step -- Iter',num2str(Pupil_iteration),'/',num2str(iter_times),':']);
+        disp(['size of center area = ' num2str(length(centerArea_IL)) 'X' num2str(length(centerArea_IL)) ]);
+        
+        %% excute PSF computing funcion
+        [psfWAVE LFpsfWAVE] = calcPSF(p1, p2, p3, fobj, NA, x1space, x2space, pixelPitch/OSR, lambda, MLARRAY, d, M, n,  centerArea_IL,MLARRAYab);
+        psfWAVE_STACK(:,:,eachpt)  = psfWAVE;
+        LFpsfWAVE_STACK(:,:,eachpt)= LFpsfWAVE;
+    end
+    origin = psfWAVE_STACK;
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    for mse = rms_ratio
+        for num = 1:1:block
+            disp(['3Step -- Iter',num2str(Pupil_iteration),'/',num2str(iter_times),':']);
+            disp(strcat('block = ',num2str(num),'/',num2str(block)));
+            d = fml;
+            %% aberration
+            if ab_flag == 1
+                para.M = M; para.num = num; para.mse = mse;
+                mkdir(strcat('./PSFmatrix/',num2str(M),'aberration_',num2str(mse),'/'));
+                mkdir(strcat('./PSFmatrix/',num2str(M),'aberration_',num2str(mse),'/ab_psf/'));
+                psfWAVE_STACK = origin;
+                f = fftshift(fft2(psfWAVE_STACK(:,:,round(size(psfWAVE_STACK,3)/2))));
+                mask = imbinarize(log(abs(f)),31);
+                tmpline = mask(round(size(psfWAVE_STACK,1)/2),1:end);
+                D = sum(tmpline(:));
+                tempaperture = zeros(D,D);
+                if pupil_flag == 0   
+                    aberration_iter = create_aberration(tempaperture,mse,para);
+                else
+                    abermask = zeros(size(calcu_phase_k));
+                    abermask(calcu_phase_k ~= 0) = 1;
+                end
+                padr = round((size(psfWAVE_STACK,1) - size(aberration_iter,1))/2);
+                origin_aberration = aberration_iter;
+                aberration = padarray(aberration_iter,[padr,padr],0,'both');
+                for i = 1:size(psfWAVE_STACK,3)
+                    psf_fft = fftshift(fft2(psfWAVE_STACK(:,:,i)));
+                    psf_fft = psf_fft .* exp(1i* aberration);
+                    if pupil_flag == 1
+                        if i == 1
+                            padphase = round((size(psfWAVE_STACK,1) - size(abermask,1))/2);
+                            abermask = padarray(abermask,[padphase,padphase],0,'both');
+                        end
+                        psf_fft = psf_fft.* abermask;
+                    end
+                    psf_fft(isnan(psf_fft)) = 0;
+                    psfWAVE_STACK(:,:,i) = ifft2(ifftshift(psf_fft));
+                end
+            end
+            if modulate ~= 1
+                MLARRAYab = 1;
+            end
+            %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+            %%%%%%%%%%%%% Compute Light Field PSFs (light field) %%%%%%%%%%%%%
+            %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+            x1objspace = (pixelPitch/M)*[-floor(Nnum/2):1:floor(Nnum/2)];
+            x2objspace = (pixelPitch/M)*[-floor(Nnum/2):1:floor(Nnum/2)];
+            XREF = ceil(length(x1objspace)/2);
+            YREF = ceil(length(x1objspace)/2);
+            if newfresnel == 1
+                H = zeros( size(psfWAVE_STACK,1)/OSR, size(psfWAVE_STACK,1)/OSR, length(x1objspace), length(x2objspace), length(x3objspace) );
+            else
+                CP = ( (centerPT-1)/OSR+1 - halfWidth/OSR :1: (centerPT-1)/OSR+1 + halfWidth/OSR  );
+                H = zeros( length(CP),length(CP), length(x1objspace), length(x2objspace), length(x3objspace) );
+            end
+            disp(['3Step -- Iter',num2str(Pupil_iteration),'/',num2str(iter_times),':']);
+            disp(['Computing LF PSFs (2/3)']);
+            for i=1:length(x1objspace)*length(x2objspace)*length(x3objspace) ,
+                [a, b, c] = ind2sub([length(x1objspace) length(x2objspace) length(x3objspace)], i);
+                psfREF = psfWAVE_STACK(:,:,c);
+                
+                psfSHIFT= im_shift2(psfREF, OSR*(a-XREF), OSR*(b-YREF) ); % shift the psf as the point on the object plane becomes [a b]
+                if newfresnel == 1
+                    [~, ~, f1] = one_step_prop(psfSHIFT.*MLARRAY.*MLARRAYab,lambda, pixelPitch/OSR, d);
+                    f1= im_shift2(f1, -OSR*(a-XREF), -OSR*(b-YREF) );
+                    f1_CP  = gydbinning(abs(f1).^2,OSR);
+                else
+                    [f1,dx1,x1]=fresnel2D(psfSHIFT.*MLARRAY.*MLARRAYab, pixelPitch/OSR,d,lambda);
+                    f1= im_shift2(f1, -OSR*(a-XREF), -OSR*(b-YREF) );
+                    xmin =  max( centerPT  - halfWidth, 1);
+                    xmax =  min( centerPT  + halfWidth, size(f1,1) );
+                    ymin =  max( centerPT  - halfWidth, 1);
+                    ymax =  min( centerPT  + halfWidth, size(f1,2) );
+                    f1_AP = zeros(size(f1));
+                    f1_AP( (xmin:xmax), (ymin:ymax) ) = f1( (xmin:xmax), (ymin:ymax) );
+                    [f1_AP_resize, x1shift, x2shift] = pixelBinning(abs(f1_AP.^2), OSR);
+                    f1_CP = f1_AP_resize( CP - x1shift, CP-x2shift ); 
+                end
+                H(:,:,a,b,c) = f1_CP;
+            end
+            for aa=1:size(H,3)
+                for bb=1:size(H,4)
+                    for kk=1:size(H,5)
+                        temp=H(:,:,aa,bb,kk);
+                        H(:,:,aa,bb,kk)= H(:,:,aa,bb,kk)./sum(temp(:));
+                    end
+                end
+            end
+            %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+            %%%%%%%%%%%% Clear variables that are no longer necessary %%%%%%%%
+            %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+            clear LFpsfWAVE_STACK;
+            clear LFpsfWAVE_VIEW;
+            clear psfWAVE_VIEW;
+            clear LFpsfWAVE;
+            clear PSF_AP;
+            clear PSF_AP_resize;
+            clear PSF_CP;
+            clear f1;
+            clear f1_AP;
+            clear f1_AP_resize;
+            clear f1_CP;
+            clear psfREF;
+            clear psfSHIFT;
+            %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+            
+            %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+            tol = 0.005;
+            for i=1:size(H,5),
+                H4Dslice = H(:,:,:,:,i);
+                H4Dslice(find(H4Dslice< (tol*max(H4Dslice(:))) )) = 0;
+                H(:,:,:,:,i) = H4Dslice;
+            end
+            %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+            %% 右移
+            if OSR == 5
+                temp = zeros(size(H,1)+1,size(H,2)+1,size(H,3),size(H,4),size(H,5));
+                temp(2:end,2:end,:,:,:) = H;
+                H = temp(1:end-1,1:end-1,:,:,:);
+            end
+            
+            %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+            %%%%%%%%%%%% Calculate Ht (transpose for backprojection) %%%%%%%%%
+            %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+            % Ht = calcHt(H);
+            centerCP = ceil(length(CP)/2);
+            CAindex = zeros(length(x3objspace),2);
+            for i=1:length(x3objspace),
+                IMGSIZE_REF_IL = ceil(IMGSIZE_REF*( abs(x3objspace(i))/p3max));
+                halfWidth_IL =  max(Nnum*(IMGSIZE_REF_IL + 0 ), 2*Nnum);
+                CAindex(i,1) = max( centerCP - halfWidth_IL , 1);
+                CAindex(i,2) = min( centerCP + halfWidth_IL , size(H,1));
+            end
+            %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+            IMGsize=size(H,1)-mod((size(H,1)-Nnum),2*Nnum);   %%%%% dertermine the psf size
+            psf=zeros(IMGsize,IMGsize,Nnum,Nnum,size(H,5));
+            for z=1:size(H,5)
+                
+                sLF=zeros(IMGsize,IMGsize,Nnum,Nnum);
+                index1=round(size(H,1)/2)-fix(size(sLF,1)/2);
+                index2=round(size(H,1)/2)+fix(size(sLF,1)/2);
+                for ii=1:size(H,3)
+                    for jj=1:size(H,4)
+                        sLF(:,:,ii,jj)=im_shift3(squeeze(H(index1:index2,index1:index2,ii,jj,z)),ii-((Nnum+1)/2), jj-(Nnum+1)/2);
+                    end
+                end
+                
+                bb=zeros(Nnum,Nnum,size(sLF,1)/size(H,3),size(sLF,2)/size(H,4),Nnum,Nnum);
+                for i=1:size(H,3)
+                    for j=1:size(H,4)
+                        for a=1:size(sLF,1)/size(H,3)
+                            for b=1:size(sLF,2)/size(H,4)
+                                bb(i,j,a,b,:,:)=squeeze(  sLF(  (a-1)*Nnum+i,(b-1)*Nnum+j,:,:  )  );
+                            end
+                        end
+                    end
+                end
+                WDF=zeros(  size(sLF,1),size(sLF,2),Nnum,Nnum  );
+                for a=1:size(sLF,1)/size(H,3)
+                    for c=1:Nnum
+                        x=Nnum*a+1-c;
+                        for b=1:size(sLF,2)/size(H,4)
+                            for d=1:Nnum
+                                y=Nnum*b+1-d;
+                                WDF(x,y,:,:)=squeeze(bb(:,:,a,b,c,d));
+                            end
+                        end
+                    end
+                end
+                psf(:,:,:,:,z)=WDF;   
+            end        
+            psf_t=zeros(size(psf));
+            for ii=1:Nnum
+                for jj=1:Nnum
+                    for cc=1:size(psf,5)
+                        psf_t(:,:,ii,jj,cc)=rot90( squeeze(psf(:,:,ii,jj,cc)),2 );
+                    end
+                end
+            end
+            %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+            %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+            disp(['3Step -- Iter',num2str(Pupil_iteration),'/',num2str(iter_times),':']);
+            disp('Saving PSF matrix file...');
+            if pupil_flag == 1
+                for i = 1:size(psf,5)
+                    psf_z = psf(:,:,:,:,i);
+                    save([PSFsavepathgen,'psf_pupil',num2str(Pupil_iteration),'_layer_',num2str(i),'.mat'] ,'psf_z','-v7.3');
+                end
+                disp(['3Step -- Iter',num2str(Pupil_iteration),'/',num2str(iter_times),':']);
+                disp('PSF computation complete.');
+            end
+        end
+    end
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+end
