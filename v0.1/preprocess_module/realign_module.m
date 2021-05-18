@@ -5,7 +5,9 @@ function [first_WDF] = realign_module(preprocess_param, rawdata_name, realigndat
 % in one video, it will save the file automatically with the suffix:
 % _No0(1,2,....group_count).tif
 
-% Last update: 05/15/2021 
+% Last update: 05/15/2021. MW
+% Last update: 05/15/2021. YZ
+
 
 % Input: 
 % preprocess_param            realign parameter
@@ -49,13 +51,14 @@ slight_resize = preprocess_param.slight_resize; % slight resize raw data in real
 slight_rotation = preprocess_param.slight_rotation; % slight rotate raw data in realign function (0 by default) Note that we do not recommend resize and rotate in realign module.
 
 if(auto_center_mode == 1) % It is not recommended
-    img = double(imread(rawdata_name, auto_center_frame + 1));
+    img = double(imread(rawdata_name, auto_center_frame + 1)); % note imread only read the top image of a stack
     [center_X, center_Y, ~] = AutoCenter(img, Nnum);
 end
 
 command = sprintf('ReAlign %d %s %s %d %d %d %d %d %d %s %d %d %d %d %s %s %d %f %f',...
     Nshift, realigndata_name_perfix, rawdata_name, start_frame, center_X, center_Y, Nx,...
-    group_count, group_mode, conf_name, frame_interval, upsampling_resize, Nnum, Ny, realign_mode, centerview, rotation, slight_resize, slight_rotation);
+    group_count, group_mode, conf_name, frame_interval, upsampling_resize, Nnum, Ny, ...
+    realign_mode, centerview, rotation, slight_resize, slight_rotation);
 system(command);
 
 % load first group of realigned wdf
@@ -71,6 +74,8 @@ end
 
 end
 
+
+%% utility function
 function [Xcenter,Ycenter, prob] = AutoCenter(img, Nnum)
 
 SUB_NUM = 3; % n

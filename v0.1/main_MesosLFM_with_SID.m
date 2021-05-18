@@ -4,18 +4,24 @@ close all
 %% this file is the main file for the meso-sLFM calcium data processing.
 %  this pipeline contains from reading to calcium sensing.
 
-%  last update: 5/11/2021. YZ
+
+%  last update: 5/18/2021. YZ
 %  last update: 5/15/2021. MW
 
+addpath('background_rejection');
+addpath('main demixing');
+addpath('preprocess_module');
+addpath('reconstruction');
+addpath('seed_generation_module');
+addpath('segmentation_module');
 addpath(genpath('utility'));
-addpath(genpath('preprocess_module'));
-addpath(genpath('reconstruction_module'));
-outdir = 'out\\crystal_skull_std_dense';
+
+outdir = 'D:\\data\\RUSH3D_GYD\\0309_out';
 mkdir(outdir)
 
-rawdata_path = 'G:/RUSHdata/mouse0512/thy1gcamp6x_z112/'; % raw data path (before rotate, resize and rotate);
-first_file_name = 'thy1gcamp6x_1_3x3_20.0ms_HBar_Hardware_LaserCount1_210512170447'; % in one video or one capture, the name of first stack
-input_rawdata_perfix = [rawdata_path, first_file_name]; % the first file in one capture
+rawdata_path = 'D:\data\RUSH3D_GYD\0309'; % raw data path (before rotate, resize and rotate);
+first_file_name = 'X1_NORMAL_3x3_25.0ms_HBar_Hardware_LaserCount1_210309202631'; % in one video or one capture, the name of first stack
+input_rawdata_perfix = [rawdata_path, '\\', first_file_name]; % the first file in one capture
 %% colormap
 % colormap
 color_scheme_npg = [...
@@ -33,6 +39,7 @@ color_scheme_npg = [...
 
 %% psf parameters
 %  reconstruction parameters
+disp('---------------------------load psf---------------------------')
 psf_param.M = 3.1746; %% Magnification = 3.17
 psf_param.Nshift = 3; %% Scanning Times = 3 x 3
 psf_param.Nnum = 15; %% 15 x 15 pixels behind each MicroLen
@@ -41,62 +48,65 @@ psf_param.PSF_size = 5; %%£¨x,y,u,v,z£©---->(x,y,u,z) no meaning
 psf_param.downsampling_rate = 1; %% Downsampling rate for PSF
 psf_param.psf_layer_position = [1 : 2 : 51, 52 : 1 : 151, 153 : 2 : 201];
 
-psfpath = 'Z:/PSF/psf_zww/20200125_genepsf_3.1746x_sim_neg400T400_dz4_15Nnum_OSR5';
+psfpath = 'D:\data\RUSH3D_GYD\20200125_genepsf_3.1746x_sim_neg400T400_dz4_15Nnum_OSR5';
 
 [psf,psf_param] = psf_load_module(psf_param,psfpath);
 
 %% rotate && resize
-
-rr_savepath = strcat(outdir,'rotate_resize/'); % raw data after rotate and resize will be save as the same format in this folder
+disp('---------------------------rotate_resize---------------------------')
+rr_savepath = strcat(outdir,'\\rotate_resize'); % raw data after rotate and resize will be save as the same format in this folder
 rr_savename = strcat('rr_', first_file_name); % share the same file name
-rr_rawdata_name = strcat(rr_savepath, rr_savename); 
+rr_rawdata_name = strcat(rr_savepath, '\\', rr_savename); 
 if ~exist(rr_savepath,'file')
     mkdir(rr_savepath);
 end
 
-preprocess_param.large_cycle = 2;  % total image number: large_cycle * small_cycle
+preprocess_param.downsampling_rate = 1; % Downsampling rate for PSF
+preprocess_param.large_cycle = 24;  % total image number: large_cycle * small_cycle
 preprocess_param.small_cycle = 40; % In general, one stack has 40 images or less
-preprocess_param.pre_rotate = -0.0971; % slight rotate (degree)
-preprocess_param.pre_resize = 0.9987; % slight resize (proportion)
+preprocess_param.pre_rotate = -0.029; % slight rotate (degree),
+preprocess_param.pre_resize = 1; % slight resize (proportion)
 preprocess_param.Nnum = 15; % 15 x 15 pixels behind each microlen. This parameter do not have to change.  
 preprocess_param.Nshift = 3; % scanning for Nshift x Nshift times (all choices: 3: 3 x 3; 5: 5 x 5; 13: 13 x 13)
 preprocess_param.upsampling = preprocess_param.Nnum / preprocess_param.Nshift / preprocess_param.downsampling_rate;
 preprocess_param.rotWDF = 0; %% no meaning
 
-raw_stack_after_rr = rotate_resize_module(preprocess_param, input_rawdata_perfix, rr_rawdata_name); 
+raw_stack_after_rr = rotate_resize_module(preprocess_param, input_rawdata_perfix, rr_rawdata_name); % correct raw size
 
 %% std with detrending(optional)
 
 % Note that at least one of them is 1.
 preprocess_param.std_option = 1; % calculating standard deviation of one video and process the std data in the post pipeline when 1
-preprocess_param.video_option = 1; % realign and reconstruction one frame by one frame when 1
 
-std_savepath = strcat(outdir,'std/'); % realign data after realign will be saved in this folder
+preprocess_param.maxIter = 10;
+
+std_savepath = strcat(outdir, '\\', 'std'); % realign data after realign will be saved in this folder
 std_savename = strcat('std_', first_file_name); % share the same file name
-std_data_name = strcat(std_savepath, std_savename); 
+std_data_name = strcat(std_savepath, '\\',std_savename); 
 if ~exist(std_savepath,'file')
     mkdir(std_savepath);
 end
 
 if preprocess_param.std_option == 1
-    raw_stack_after_std = std_module(preprocess_param,raw_stack_after_rr,std_data_name);
+    raw_stack_after_std = std_module(preprocess_param,raw_stack_after_rr,std_data_name); % 
 end
 
 %% realign raw data and std data 
-
+%  realign will combine the scanned image 
+%  the rotation and resize corrected data
 rawdata_name = strcat(rr_rawdata_name,'.',num2str(0),'.tiff'); % in one video or one capture, the name of first stack (***.0.tiff) including folder path
 
-realign_savepath = strcat(outdir,'realign/'); % realign data after realign will be saved in this folder
+realign_savepath = strcat(outdir, '\\', 'realign'); % realign data after realign will be saved in this folder
 realign_savename = strcat('realign_', first_file_name); % share the same file name
-realigndata_name_perfix = strcat(realign_savepath, realign_savename); 
+realigndata_name_perfix = strcat(realign_savepath, '\\',realign_savename); 
 if ~exist(realign_savepath,'file') % output file name including folder path (Note that the folder must exist and it will not report an error when missing folder)
     mkdir(realign_savepath);
 end
 
-std_data_name = strcat(std_data_name,'.tiff');
-std_realign_savepath = strcat(outdir,'std_realign/');
+std_data_name = strcat(std_data_name, '.tiff');
+std_realign_savepath = strcat(outdir, '\\', 'std_realign');
 std_realign_savename = strcat('std_realign_', first_file_name); % share the same file name
-std_realigndata_name_perfix = strcat(std_realign_savepath, std_realign_savename);
+std_realigndata_name_perfix = strcat(std_realign_savepath, '\\', std_realign_savename);
 if ~exist(std_realign_savepath,'file') % output file name including folder path (Note that the folder must exist and it will not report an error when missing folder)
     mkdir(std_realign_savepath);
 end
@@ -115,21 +125,21 @@ preprocess_param.Nx = 129; % take half number of microlens in x direction (total
 preprocess_param.Ny = 129; % take half number of microlens in y direction (total number: Nx * 2 + 1) ( Nx = Ny is strongly recommended) (has a problem !!!!!)
 
 
-
 preprocess_param.conf_name = '.utility/realign/3x3.conf.sk.png'; % configuration file for scanning which is corresponding to Nshift
 
 
 preprocess_param.group_mode = 1; % Mode of realign between different frame of rawdata. 0: jump mode (group1: 1-9, group2: 10-18,...); 1: slide window(group1: 1-9, group2: 2-10,...)
-if preprcessparam.group_mode == 1
-    preprocess_param.group_count = large_cycle*small_cycle-Nshift^2; % the number of realigned WDF stacks
+if preprocess_param.group_mode == 1
+    preprocess_param.group_count = preprocess_param.large_cycle*preprocess_param.small_cycle-preprocess_param.Nshift^2; % the number of realigned WDF stacks
 else
-    preprocess_param.group_count = floor(large_cycle*small_cycle/Nshift^2);
+    preprocess_param.group_count = floor(preprocess_param.large_cyclepreprocess_param.*small_cycle/preprocess_param.Nshift^2);
 end
-
 
 
 preprocess_param.realign_mode = 'LZ'; % realignMode for different scanning sequence (all choices: 'LZ': light path scanning (in RUSH3D). 'ZGX': stage scanning in the opposite direction from 'LZ')
 preprocess_param.centerview = 'center.tiff'; % file name of centerview in the same output directory. (If centerview is not needed, use 'None'. If we need centerview only, use *.only.tiff)
+
+preprocess_param.video_option = 1; % realign and reconstruction one frame by one frame when 1
 
 preprocess_param.rotation =  0; % rotate raw data clockwise (all choice: 0, 90, 180, 270)
 preprocess_param.slight_resize = 1; % slight resize raw data in realign function (1 by default)
@@ -140,24 +150,24 @@ if preprocess_param.video_option == 1
     std_WDF = realign_module(preprocess_param, rawdata_name, realigndata_name_perfix);
 end
 
-if preprocess_param.std_option == 1
-    preprocess_param.group_count = 1;
-    first_WDF = realign_module(preprocess_param, std_data_name, std_realigndata_name_perfix);
-end
+% if preprocess_param.std_option == 1
+%     preprocess_param.group_count = 1;
+%     first_WDF = realign_module(preprocess_param, std_data_name, std_realigndata_name_perfix);
+% end
 
 %% reconstruction module
 realign_datafilename = strcat(realigndata_name_perfix,'_No');
 
-std_recon_savepath = strcat(outdir,'std_recon/'); % realign data after realign will be saved in this folder
+std_recon_savepath = strcat(outdir, '\\','std_recon'); % realign data after realign will be saved in this folder
 std_recon_savename = strcat('std_recon_', first_file_name); % share the same file name
-std_recon_name_perfix = strcat(std_recon_savepath, std_recon_savename); 
+std_recon_name_perfix = strcat(std_recon_savepath, '\\', std_recon_savename); 
 if ~exist(std_recon_savepath,'file') % output file name including folder path (Note that the folder must exist and it will not report an error when missing folder)
     mkdir(std_recon_savepath);
 end
 
-vid_recon_savepath = strcat(outdir,'vid_recon/'); % realign data after realign will be saved in this folder
+vid_recon_savepath = strcat(outdir, '\\','vid_recon'); % realign data after realign will be saved in this folder
 vid_recon_savename = strcat('vid_recon_', first_file_name); % share the same file name
-vid_recon_name_perfix = strcat(vid_recon_savepath, vid_recon_savename); 
+vid_recon_name_perfix = strcat(vid_recon_savepath, '\\', vid_recon_savename); 
 if ~exist(vid_recon_savepath,'file') % output file name including folder path (Note that the folder must exist and it will not report an error when missing folder)
     mkdir(vid_recon_savepath);
 end
@@ -175,8 +185,6 @@ recon_param.margin = 9; % margin overlap
 recon_param.estimate_patch_size = 700;
 recon_param.pixel_size = 1.2e-6; % lateral pixel size
 recon_param.per_slice_depth = 4e-6; % axial slice depth range ???
-
-
 
 
 % reconstruct STD
@@ -206,7 +214,6 @@ if preprocess_param.video_option == 1
         vid_volume = vid  / max(vid_volume(:));
     end % the position can change ....
 end
-
 
 
 %% neuron segmentation generation module

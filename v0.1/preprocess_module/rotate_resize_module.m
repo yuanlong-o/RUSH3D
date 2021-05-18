@@ -17,6 +17,7 @@ function [raw_stack_after_rr] = rotate_resize_module(preprocess_param,input_rawd
 % raw_stack_after_rr
 % output file             save in the outdir separately in several stacks
 
+% parameter parser
 large_cycle = preprocess_param.large_cycle;
 small_cycle = preprocess_param.small_cycle;
 pre_rotate = preprocess_param.pre_rotate;
@@ -30,6 +31,9 @@ raw_stack_after_rr = zeros(size(tmp,1),size(tmp,2),large_cycle*small_cycle);
 
 m = 1;
 for num = 0:1:large_cycle-1
+    if mod(num, 5) == 0
+        fprintf('%d in %d processing \n', num, large_cycle-1)
+    end
     for i = 1:1:small_cycle
         rawdata_name = strcat(input_rawdata_perfix,'.',num2str(num),'.tiff');
         tmp = double(imread(rawdata_name,i));
