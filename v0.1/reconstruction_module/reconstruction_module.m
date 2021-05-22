@@ -165,7 +165,7 @@ for i=1:maxIter
                     end
                 end
             end
-            save(strcat(recon_savepath,recon_name_perfix,'map_wavshape_iter',num2str(i),'.mat'),'map_wavshape');            
+            save(strcat(recon_name_perfix,'map_wavshape_iter',num2str(i),'.mat'),'map_wavshape');            
         end    
     end
     
@@ -220,9 +220,9 @@ for i=1:maxIter
     % save (if it is too large, save as several stacks)
     if size(A,1) > 2000 && size(A,3) > 100
         imwriteTFSK(single(A(:,:,1:round(size(A,3)/2))), ...
-            [recon_savepath,recon_name_perfix,'_vid', num2str(frame),'_iter_',num2str(i),'.0.tiff']);
+            [recon_name_perfix,'_vid', num2str(frame),'_iter_',num2str(i),'.0.tiff']);
         imwriteTFSK(single(A(:,:,round(size(A,3)/2)+1:end)), ...
-            [recon_savepath,recon_name_perfix,'_vid', num2str(frame),'_iter_',num2str(i),'.1.tiff']);
+            [recon_name_perfix,'_vid', num2str(frame),'_iter_',num2str(i),'.1.tiff']);
     else
         imwriteTFSK(single(A), [recon_name_perfix,'_vid', num2str(frame),'_iter_',num2str(i),'.tiff']);
     end
