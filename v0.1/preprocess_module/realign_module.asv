@@ -55,12 +55,13 @@ if(auto_center_mode == 1) % It is not recommended
     [center_X, center_Y, ~] = AutoCenter(img, Nnum);
 end
 
-
-command = sprintf('ReAlign %d %s %s %d %d %d %d %d %d %s %d %d %d %d %s %s %d %f %f',...
+command0 = sprintf('cd ./utility/Realign/');
+command = sprintf('cd ./utility/Realign/ReAlign %d %s %s %d %d %d %d %d %d %s %d %d %d %d %s %s %d %f %f',...
     Nshift, realigndata_name_perfix, rawdata_name, start_frame, center_X, center_Y, Nx,...
     group_count, group_mode, conf_name, frame_interval, upsampling_resize, Nnum, Ny, ...
     realign_mode, centerview, rotation, slight_resize, slight_rotation);
 
+system(command0);
 system(command);
 
 % load first group of realigned wdf
