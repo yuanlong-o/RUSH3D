@@ -11,7 +11,7 @@ close all
 addpath('background_rejection');
 addpath('main demixing');
 addpath('preprocess_module');
-addpath('reconstruction');
+addpath('reconstruction_module');
 addpath('seed_generation_module');
 addpath('segmentation_module');
 addpath(genpath('utility'));
@@ -19,8 +19,11 @@ addpath(genpath('utility'));
 outdir = 'D:\\data\\RUSH3D_GYD\\0309_out';
 mkdir(outdir)
 
-rawdata_path = 'D:\data\RUSH3D_GYD\0309'; % raw data path (before rotate, resize and rotate);
-first_file_name = 'X1_NORMAL_3x3_25.0ms_HBar_Hardware_LaserCount1_210309202631'; % in one video or one capture, the name of first stack
+% rawdata_path = 'D:\data\RUSH3D_GYD\0309'; % raw data path (before rotate, resize and rotate);
+% first_file_name = 'X1_NORMAL_3x3_25.0ms_HBar_Hardware_LaserCount1_210309202631'; % in one video or one capture, the name of first stack
+rawdata_path = 'G:\RUSHdata\mouse0512\thy1gcamp6x_z112';
+first_file_name = 'thy1gcamp6x_1_3x3_20.0ms_HBar_Hardware_LaserCount1_210512170447'; % in one video or one capture, the name of first stack
+
 input_rawdata_perfix = [rawdata_path, '\\', first_file_name]; % the first file in one capture
 %% colormap
 % colormap
@@ -39,7 +42,7 @@ color_scheme_npg = [...
 
 %% psf parameters
 %  reconstruction parameters
-disp('---------------------------load psf---------------------------')
+disp('---------------------------load psf---------------------------');
 psf_param.M = 3.1746; %% Magnification = 3.17
 psf_param.Nshift = 3; %% Scanning Times = 3 x 3
 psf_param.Nnum = 15; %% 15 x 15 pixels behind each MicroLen
@@ -48,12 +51,13 @@ psf_param.PSF_size = 5; %%£¨x,y,u,v,z£©---->(x,y,u,z) no meaning
 psf_param.downsampling_rate = 1; %% Downsampling rate for PSF
 psf_param.psf_layer_position = [1 : 2 : 51, 52 : 1 : 151, 153 : 2 : 201];
 
-psfpath = 'D:\data\RUSH3D_GYD\20200125_genepsf_3.1746x_sim_neg400T400_dz4_15Nnum_OSR5';
+% psfpath = 'D:\data\RUSH3D_GYD\20200125_genepsf_3.1746x_sim_neg400T400_dz4_15Nnum_OSR5';
+psfpath = 'Z:\PSF\psf_zww\20200125_genepsf_3.1746x_sim_neg400T400_dz4_15Nnum_OSR5';
 
 [psf,psf_param] = psf_load_module(psf_param,psfpath);
 
 %% rotate && resize
-disp('---------------------------rotate_resize---------------------------')
+disp('---------------------------rotate_resize---------------------------');
 rr_savepath = strcat(outdir,'\\rotate_resize'); % raw data after rotate and resize will be save as the same format in this folder
 rr_savename = strcat('rr_', first_file_name); % share the same file name
 rr_rawdata_name = strcat(rr_savepath, '\\', rr_savename); 
@@ -62,7 +66,7 @@ if ~exist(rr_savepath,'file')
 end
 
 preprocess_param.downsampling_rate = 1; % Downsampling rate for PSF
-preprocess_param.large_cycle = 24;  % total image number: large_cycle * small_cycle
+preprocess_param.large_cycle = 2;  % total image number: large_cycle * small_cycle
 preprocess_param.small_cycle = 40; % In general, one stack has 40 images or less
 preprocess_param.pre_rotate = -0.029; % slight rotate (degree),
 preprocess_param.pre_resize = 1; % slight resize (proportion)
@@ -75,8 +79,10 @@ raw_stack_after_rr = rotate_resize_module(preprocess_param, input_rawdata_perfix
 
 %% std with detrending(optional)
 
+disp('---------------------------std---------------------------');
 % Note that at least one of them is 1.
 preprocess_param.std_option = 1; % calculating standard deviation of one video and process the std data in the post pipeline when 1
+preprocess_param.video_option = 0;
 
 preprocess_param.maxIter = 10;
 
@@ -94,6 +100,7 @@ end
 %% realign raw data and std data 
 %  realign will combine the scanned image 
 %  the rotation and resize corrected data
+disp('---------------------------realign---------------------------');
 rawdata_name = strcat(rr_rawdata_name,'.',num2str(0),'.tiff'); % in one video or one capture, the name of first stack (***.0.tiff) including folder path
 
 realign_savepath = strcat(outdir, '\\', 'realign'); % realign data after realign will be saved in this folder
@@ -125,7 +132,7 @@ preprocess_param.Nx = 129; % take half number of microlens in x direction (total
 preprocess_param.Ny = 129; % take half number of microlens in y direction (total number: Nx * 2 + 1) ( Nx = Ny is strongly recommended) (has a problem !!!!!)
 
 
-preprocess_param.conf_name = '.utility/realign/3x3.conf.sk.png'; % configuration file for scanning which is corresponding to Nshift
+preprocess_param.conf_name = './utility/realign/3x3.conf.sk.png'; % configuration file for scanning which is corresponding to Nshift
 
 
 preprocess_param.group_mode = 1; % Mode of realign between different frame of rawdata. 0: jump mode (group1: 1-9, group2: 10-18,...); 1: slide window(group1: 1-9, group2: 2-10,...)
@@ -139,7 +146,7 @@ end
 preprocess_param.realign_mode = 'LZ'; % realignMode for different scanning sequence (all choices: 'LZ': light path scanning (in RUSH3D). 'ZGX': stage scanning in the opposite direction from 'LZ')
 preprocess_param.centerview = 'center.tiff'; % file name of centerview in the same output directory. (If centerview is not needed, use 'None'. If we need centerview only, use *.only.tiff)
 
-preprocess_param.video_option = 1; % realign and reconstruction one frame by one frame when 1
+preprocess_param.video_option = 0; % realign and reconstruction one frame by one frame when 1
 
 preprocess_param.rotation =  0; % rotate raw data clockwise (all choice: 0, 90, 180, 270)
 preprocess_param.slight_resize = 1; % slight resize raw data in realign function (1 by default)
@@ -147,15 +154,19 @@ preprocess_param.slight_rotation = 0; % slight rotate raw data in realign functi
 
 % start realign
 if preprocess_param.video_option == 1
-    std_WDF = realign_module(preprocess_param, rawdata_name, realigndata_name_perfix);
+    first_WDF = realign_module(preprocess_param, rawdata_name, realigndata_name_perfix);
 end
 
-% if preprocess_param.std_option == 1
-%     preprocess_param.group_count = 1;
-%     first_WDF = realign_module(preprocess_param, std_data_name, std_realigndata_name_perfix);
-% end
+if preprocess_param.std_option == 1
+    preprocess_param.group_count = 1;
+    std_WDF = realign_module(preprocess_param, std_data_name, std_realigndata_name_perfix);
+end
 
 %% reconstruction module
+
+
+disp('---------------------------reconstruction---------------------------');
+gpuDevice;
 realign_datafilename = strcat(realigndata_name_perfix,'_No');
 
 std_recon_savepath = strcat(outdir, '\\','std_recon'); % realign data after realign will be saved in this folder
