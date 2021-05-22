@@ -183,7 +183,7 @@ if ~exist(vid_recon_savepath,'file') % output file name including folder path (N
     mkdir(vid_recon_savepath);
 end
 
-recon_param.angle_range = 25; % About 25 Angle views within the iteration
+recon_param.angle_range = 9; % About 25 Angle views within the iteration
 recon_param.AOstar = 1; % 1 for DAO; 0 for no DAO 
 recon_param.maxIter = 3; % Max iteration times: 2 or 3 is enough
 recon_param.defocus = 1; % 1 for defocus, 0 for no defocus
@@ -205,22 +205,22 @@ if preprocess_param.std_option == 1
         [floor(size(std_WDF,1)*preprocess_param.upsampling),floor(size(std_WDF,2)*preprocess_param.upsampling)],'cubic'),2*preprocess_param.rotWDF);
     std_volume = ones(size(std_WDF,1),size(std_WDF,2),size(psf,5));
     std_volume = std_volume./sum(std_volume(:)).*sum(std_volume(:))./(size(std_volume,3)*size(std_volume,4));
-    std_volume = reconstruction_module(psf_param, recon_param, std_volume, psf, std_WDF, std_recon_savepath, std_recon_name_perfix,frame);
+    std_volume = reconstruction_module(psf_param, recon_param, std_volume, psf, std_WDF, std_recon_name_perfix,frame);
     std_volume = double(std_volume);
     std_volume = std_volume  / max(std_volume(:));
 end
 
 % reconstruct frame by frame
 frame_total = preprocess_param.group_count;
-wdf_size = size(first_WDF);
 if preprocess_param.video_option == 1
+    wdf_size = size(first_WDF);
     for frame = 1 : frame_total 
         vid_WDF = wdfload_module(frame,realign_datafilename, wdf_size);
         vid_WDF = rot90(imresize(vid_WDF, ...
               [floor(size(vid_WDF,1)*preprocess_param.upsampling),floor(size(vid_WDF,2)*preprocess_param.upsampling)],'cubic'),2*preprocess_param.rotWDF);
         vid_volume = ones(size(vid_WDF,1),size(vid_WDF,2),size(psf,5));
         vid_volume = vid_volume./sum(vid_volume(:)).*sum(vid_volume(:))./(size(vid_volume,3)*size(vid_volume,4));
-        vid_volume = reconstruction_module(psf_param, recon_param, vid_volume, psf, vid_WDF, vid_recon_savepath, vid_recon_name_perfix, frame);
+        vid_volume = reconstruction_module(psf_param, recon_param, vid_volume, psf, vid_WDF, vid_recon_name_perfix, frame);
         vid_volume = double(vid_volume);
         vid_volume = vid  / max(vid_volume(:));
     end % the position can change ....
