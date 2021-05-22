@@ -1,4 +1,4 @@
-function [Xguess] = reconstruction_module(psf_param, recon_param, Xguess, psf, WDF, recon_savepath, recon_name_perfix, frame)
+function [Xguess] = reconstruction_module(psf_param, recon_param, Xguess, psf, WDF, recon_name_perfix, frame)
 %% Reconstruction Module reconstuction with DAO
 % This program is used to reconstruct volume from wdf with digital
 % abberation optics correction
