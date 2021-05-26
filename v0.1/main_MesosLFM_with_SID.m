@@ -3,27 +3,22 @@ close all
 
 %% this file is the main file for the meso-sLFM calcium data processing.
 %  this pipeline contains from reading to calcium sensing.
-
-
-%  last update: 5/18/2021. YZ
-%  last update: 5/15/2021. MW
+%  last update: 5/26/2021. YZ
+%  last update: 5/23/2021. MW
 
 addpath('background_rejection');
 addpath('main demixing');
 addpath('preprocess_module');
 addpath('reconstruction_module');
 addpath('seed_generation_module');
-addpath('segmentation_module');
+addpath(genpath('segmentation_module'));
 addpath(genpath('utility'));
 
 outdir = 'D:\\data\\RUSH3D_GYD\\0309_out';
 mkdir(outdir)
 
-% rawdata_path = 'D:\data\RUSH3D_GYD\0309'; % raw data path (before rotate, resize and rotate);
-% first_file_name = 'X1_NORMAL_3x3_25.0ms_HBar_Hardware_LaserCount1_210309202631'; % in one video or one capture, the name of first stack
-rawdata_path = 'G:\RUSHdata\mouse0512\thy1gcamp6x_z112';
-first_file_name = 'thy1gcamp6x_1_3x3_20.0ms_HBar_Hardware_LaserCount1_210512170447'; % in one video or one capture, the name of first stack
-
+rawdata_path = 'D:\data\RUSH3D_GYD\0309'; % raw data path (before rotate, resize and rotate);
+first_file_name = 'X1_NORMAL_3x3_25.0ms_HBar_Hardware_LaserCount1_210309202631'; % in one video or one capture, the name of first stack
 input_rawdata_perfix = [rawdata_path, '\\', first_file_name]; % the first file in one capture
 %% colormap
 % colormap
@@ -42,7 +37,7 @@ color_scheme_npg = [...
 
 %% psf parameters
 %  reconstruction parameters
-disp('---------------------------load psf---------------------------');
+disp('---------------------------load psf---------------------------')
 psf_param.M = 3.1746; %% Magnification = 3.17
 psf_param.Nshift = 3; %% Scanning Times = 3 x 3
 psf_param.Nnum = 15; %% 15 x 15 pixels behind each MicroLen
@@ -51,13 +46,12 @@ psf_param.PSF_size = 5; %%£¨x,y,u,v,z£©---->(x,y,u,z) no meaning
 psf_param.downsampling_rate = 1; %% Downsampling rate for PSF
 psf_param.psf_layer_position = [1 : 2 : 51, 52 : 1 : 151, 153 : 2 : 201];
 
-% psfpath = 'D:\data\RUSH3D_GYD\20200125_genepsf_3.1746x_sim_neg400T400_dz4_15Nnum_OSR5';
-psfpath = 'Z:\PSF\psf_zww\20200125_genepsf_3.1746x_sim_neg400T400_dz4_15Nnum_OSR5';
+psfpath = 'D:\data\RUSH3D_GYD\20200125_genepsf_3.1746x_sim_neg400T400_dz4_15Nnum_OSR5';
 
-[psf,psf_param] = psf_load_module(psf_param,psfpath);
+[psf, psf_param] = psf_load_module(psf_param,psfpath);
 
 %% rotate && resize
-disp('---------------------------rotate_resize---------------------------');
+disp('---------------------------rotate_resize---------------------------')
 rr_savepath = strcat(outdir,'\\rotate_resize'); % raw data after rotate and resize will be save as the same format in this folder
 rr_savename = strcat('rr_', first_file_name); % share the same file name
 rr_rawdata_name = strcat(rr_savepath, '\\', rr_savename); 
@@ -66,7 +60,7 @@ if ~exist(rr_savepath,'file')
 end
 
 preprocess_param.downsampling_rate = 1; % Downsampling rate for PSF
-preprocess_param.large_cycle = 2;  % total image number: large_cycle * small_cycle
+preprocess_param.large_cycle = 24;  % total image number: large_cycle * small_cycle
 preprocess_param.small_cycle = 40; % In general, one stack has 40 images or less
 preprocess_param.pre_rotate = -0.029; % slight rotate (degree),
 preprocess_param.pre_resize = 1; % slight resize (proportion)
@@ -75,14 +69,12 @@ preprocess_param.Nshift = 3; % scanning for Nshift x Nshift times (all choices: 
 preprocess_param.upsampling = preprocess_param.Nnum / preprocess_param.Nshift / preprocess_param.downsampling_rate;
 preprocess_param.rotWDF = 0; %% no meaning
 
-raw_stack_after_rr = rotate_resize_module(preprocess_param, input_rawdata_perfix, rr_rawdata_name); % correct raw size
+[raw_stack_after_rr, total_frame_num] = rotate_resize_module(preprocess_param, input_rawdata_perfix, rr_rawdata_name); % correct raw size
 
 %% std with detrending(optional)
 
-disp('---------------------------std---------------------------');
 % Note that at least one of them is 1.
 preprocess_param.std_option = 1; % calculating standard deviation of one video and process the std data in the post pipeline when 1
-preprocess_param.video_option = 0;
 
 preprocess_param.maxIter = 10;
 
@@ -94,13 +86,13 @@ if ~exist(std_savepath,'file')
 end
 
 if preprocess_param.std_option == 1
-    raw_stack_after_std = std_module(preprocess_param,raw_stack_after_rr,std_data_name); % 
+    raw_stack_after_std = std_module(preprocess_param, raw_stack_after_rr,std_data_name); % 
 end
 
 %% realign raw data and std data 
 %  realign will combine the scanned image 
 %  the rotation and resize corrected data
-disp('---------------------------realign---------------------------');
+disp('---------------------------Realign---------------------------');
 rawdata_name = strcat(rr_rawdata_name,'.',num2str(0),'.tiff'); % in one video or one capture, the name of first stack (***.0.tiff) including folder path
 
 realign_savepath = strcat(outdir, '\\', 'realign'); % realign data after realign will be saved in this folder
@@ -110,7 +102,7 @@ if ~exist(realign_savepath,'file') % output file name including folder path (Not
     mkdir(realign_savepath);
 end
 
-std_data_name = strcat(std_data_name, '.tiff');
+
 std_realign_savepath = strcat(outdir, '\\', 'std_realign');
 std_realign_savename = strcat('std_realign_', first_file_name); % share the same file name
 std_realigndata_name_perfix = strcat(std_realign_savepath, '\\', std_realign_savename);
@@ -146,7 +138,7 @@ end
 preprocess_param.realign_mode = 'LZ'; % realignMode for different scanning sequence (all choices: 'LZ': light path scanning (in RUSH3D). 'ZGX': stage scanning in the opposite direction from 'LZ')
 preprocess_param.centerview = 'center.tiff'; % file name of centerview in the same output directory. (If centerview is not needed, use 'None'. If we need centerview only, use *.only.tiff)
 
-preprocess_param.video_option = 0; % realign and reconstruction one frame by one frame when 1
+preprocess_param.video_option = 1; % realign and reconstruction one frame by one frame when 1
 
 preprocess_param.rotation =  0; % rotate raw data clockwise (all choice: 0, 90, 180, 270)
 preprocess_param.slight_resize = 1; % slight resize raw data in realign function (1 by default)
@@ -157,16 +149,20 @@ if preprocess_param.video_option == 1
     first_WDF = realign_module(preprocess_param, rawdata_name, realigndata_name_perfix);
 end
 
+% processing std
 if preprocess_param.std_option == 1
     preprocess_param.group_count = 1;
-    std_WDF = realign_module(preprocess_param, std_data_name, std_realigndata_name_perfix);
+    std_WDF = realign_module(preprocess_param, strcat(std_data_name, '.tiff'), std_realigndata_name_perfix);
 end
 
-%% reconstruction module
+% note the output of realign will be the number of frameN - shift^2
+valid_frame_num = total_frame_num - preprocess_param.Nshift * preprocess_param.Nshift;
+movie_size = [size(std_WDF, 1), size(std_WDF, 2), valid_frame_num];
 
-
-disp('---------------------------reconstruction---------------------------');
-gpuDevice;
+%%
+% ~ 2h
+disp('---------------------------Reconstruction---------------------------');
+gpuDevice(1);
 realign_datafilename = strcat(realigndata_name_perfix,'_No');
 
 std_recon_savepath = strcat(outdir, '\\','std_recon'); % realign data after realign will be saved in this folder
@@ -183,7 +179,7 @@ if ~exist(vid_recon_savepath,'file') % output file name including folder path (N
     mkdir(vid_recon_savepath);
 end
 
-recon_param.angle_range = 9; % About 25 Angle views within the iteration
+recon_param.angle_range = 25; % About 25 Angle views within the iteration
 recon_param.AOstar = 1; % 1 for DAO; 0 for no DAO 
 recon_param.maxIter = 3; % Max iteration times: 2 or 3 is enough
 recon_param.defocus = 1; % 1 for defocus, 0 for no defocus
@@ -193,11 +189,6 @@ recon_param.num_block= 18 ; % Axial block for 10 when forword propagate
 recon_param.threshhold = 25; % Shift should not be allowed to exceed [-25,25]
 recon_param.margin = 9; % margin overlap
 
-recon_param.estimate_patch_size = 700;
-recon_param.pixel_size = 1.2e-6; % lateral pixel size
-recon_param.per_slice_depth = 4e-6; % axial slice depth range ???
-
-
 % reconstruct STD
 if preprocess_param.std_option == 1
     frame = 1;
@@ -205,71 +196,169 @@ if preprocess_param.std_option == 1
         [floor(size(std_WDF,1)*preprocess_param.upsampling),floor(size(std_WDF,2)*preprocess_param.upsampling)],'cubic'),2*preprocess_param.rotWDF);
     std_volume = ones(size(std_WDF,1),size(std_WDF,2),size(psf,5));
     std_volume = std_volume./sum(std_volume(:)).*sum(std_volume(:))./(size(std_volume,3)*size(std_volume,4));
-    std_volume = reconstruction_module(psf_param, recon_param, std_volume, psf, std_WDF, std_recon_name_perfix,frame);
+    std_volume = reconstruction_module(psf_param, recon_param, std_volume, psf, std_WDF, ...
+                                        std_recon_savepath, std_recon_name_perfix,frame);
     std_volume = double(std_volume);
     std_volume = std_volume  / max(std_volume(:));
 end
 
-% reconstruct frame by frame
-frame_total = preprocess_param.group_count;
-if preprocess_param.video_option == 1
-    wdf_size = size(first_WDF);
-    for frame = 1 : frame_total 
-        vid_WDF = wdfload_module(frame,realign_datafilename, wdf_size);
-        vid_WDF = rot90(imresize(vid_WDF, ...
-              [floor(size(vid_WDF,1)*preprocess_param.upsampling),floor(size(vid_WDF,2)*preprocess_param.upsampling)],'cubic'),2*preprocess_param.rotWDF);
-        vid_volume = ones(size(vid_WDF,1),size(vid_WDF,2),size(psf,5));
-        vid_volume = vid_volume./sum(vid_volume(:)).*sum(vid_volume(:))./(size(vid_volume,3)*size(vid_volume,4));
-        vid_volume = reconstruction_module(psf_param, recon_param, vid_volume, psf, vid_WDF, vid_recon_name_perfix, frame);
-        vid_volume = double(vid_volume);
-        vid_volume = vid  / max(vid_volume(:));
-    end % the position can change ....
-end
-
-
+% note std_volume is the final output.
+volum_size = [size(std_volume, 1), size(std_volume, 2), size(std_volume, 3)];
 %% neuron segmentation generation module
-[global_A_in, global_center] = segmentation_module(std_volume, seed_param);
+% ~ 2h
+disp('--------------------------Neuron segmentation--------------------------')
+% only keep central ones
+diff_psf_layer_position = diff(psf_param.psf_layer_position);
+buf = find(diff_psf_layer_position == 1);
+start_ind = buf(1);
+end_ind = buf(end);
+std_volume_cut = std_volume(:, :, start_ind : end_ind);
+std_volume_cut = std_volume_cut / max(std_volume_cut(:));
+volum_size_cut = [size(std_volume_cut, 1), size(std_volume_cut, 2), size(std_volume_cut, 3)];
+seed_param.outdir = outdir;
+seed_param.per_slice_depth = recon_param.per_slice_depth;
+seed_param.estimate_patch_size = 700;
+seed_param.pixel_size = 1.2e-6; % lateral pixel size
+seed_param.per_slice_depth = 4e-6; % axial slice depth range ???
+seed_param.down_factor = preprocess_param.Nnum / preprocess_param.Nshift;
+
+% segmentation related
+seed_param.neuron_number = 140;
+seed_param.neuron_lateral_size = 13;
+seed_param.local_constrast_th = 1.4;
+seed_param.optical_psf_ratio = seed_param.per_slice_depth / seed_param.pixel_size;
+seed_param.overlap_ratio = 0.5;
+seed_param.boundary_thickness = 2; % for plot
+seed_param.discard_component_save = false;
+seed_param.volume_threshold = [5 * seed_param.neuron_lateral_size.^2, 500* seed_param.neuron_lateral_size.^2];
+
+valid_seg = segmentation_module(std_volume_cut, ...
+                                            first_WDF(:, :, ceil(preprocess_param.Nnum^2 / 2)), ...
+                                            seed_param);
 
 
 %% seed module
+% ~ 4h
 % generate seed template for iterations
-[seed_array, seed_array_mask] = seed_generation_module(valid_seg, target_wigner);
+shell_radius = ceil(2* seed_param.neuron_lateral_size);
+disp('--------------------------Iteration preparation--------------------------')
 
-% note the seed is stored in 
-%% background rejection 
-%  subtract background informations in the target volume size
-%  reconstruct the side view and project to other views?
-
-processed_movie = background_removal(input_movie);
-
-
-%
-%% main iteration module
-%  the iteration is based on wigner
-max_demixing_round = 5;
-
-for i = 1 : max_demixing_round
-	[S, S_bg, bg_spatial] = update_spatial_lasso_with_bg(sensor_movie, S, S_bg, T, ...
-            T_bg, bias, bg_spatial, bg_temporal, S_mask_init,S_bg_mask_init, movie_size, maxIter_NMF);        
-
-	[T, T_bg, bg_temporal] = update_temporal_oasis_with_bg(sensor_movie, ...
-            S, S_bg, T, T_bg, bias, bg_spatial, bg_temporal, S_mask_init, S_bg_mask_init, movie_size, maxIter_NMF);     
-    
+% define wigners that is usefull
+specify_wigner = [ceil(psf_param.Nnum / 2), ceil(psf_param.Nnum / 2)];
+for i = 1 : 4
+    [u, v] = ind2sub([2, 2], i);
+    buf = [ceil(psf_param.Nnum / 2) + (-1)^u * ceil(psf_param.Nnum / 4),...
+           ceil(psf_param.Nnum / 2) + (-1)^v * ceil(psf_param.Nnum / 4)];
+    specify_wigner = [specify_wigner ; buf];
 end
 
 
-%% output
+[S_init, S_shell_init,S_mask_init, S_shell_mask_init] = seed_generation_module(psf(:, :, :, :, start_ind : end_ind), psf_param, valid_seg, ...
+                                                                volum_size_cut, specify_wigner, shell_radius);
 
 
-%%
-figure, subplot(1, 3, 1), spatial_comp_render(obj.A, global_A_in, [movie_size_h, movie_size_w])
-subplot(1, 3, 2), obj = CNMFE_show_contours(obj, 0.99); % larger parameter, larger countor
-subplot(1, 3, 3), temporal_trace_render(obj.C_raw(1 : 100, :), 'k'), sgtitle('after more runs')
-saveas(gca, sprintf('%s\\after_more_runs.png', outdir))
+%% prepare iteration video
+% ~ 2h
+bg_iter=10;
+[processed_video] = iteration_preparation(realigndata_name_perfix, valid_frame_num, specify_wigner);
 
+% background component initialization
+[bg_spatial_init, bg_temporal_init] = initialize_bg(processed_video, bg_iter);
+
+% temporal component initialization
+[T_init, T_shell_init] = initialize_T(processed_video, S_mask_init,  S_shell_mask_init);
+
+%% change S shape
+% ~ 10min
+S = cell_process_A(S_init, size(processed_video)); clear S_init
+S_mask_init= cell_process_A(S_mask_init, size(processed_video)); 
+S_mask_init = S_mask_init > 0;
+% 
+S_bg = cell_process_A(S_shell_init, size(processed_video)) ;  clear S_shell_init
+S_shell_mask_init = cell_process_A(S_shell_mask_init, size(processed_video));
+S_shell_mask_init = S_shell_mask_init > 0;
+
+save(sprintf('%s\\initialization.mat', outdir), 'S', 'S_bg', 'S_mask_init', ...
+                                                'S_shell_mask_init', 'T_init', 'T_shell_init', '-v7.3')
+%% main iteration module
+disp('--------------------------main NMF--------------------------')
+%  the iteration is based on wigner
+max_demixing_round = 5;
+maxIter_NMF = 10;
+
+% main demixing
+T = T_init;
+T_bg = T_shell_init;
+bg_spatial =  bg_spatial_init; % 
+bg_temporal = bg_temporal_init;
+
+
+% S = S(:, 1 : 20);
+% S_mask_init = S_mask_init(:, 1 : 20);
+% S_bg = S_bg(:, 1 : 20);
+% S_shell_mask_init = S_shell_mask_init(:, 1 : 20);
+% T = T(1 : 20, :);
+% T_bg = T_bg(1 : 20, :);
+
+for i = 1 : max_demixing_round
+    fprintf('main demixing %d in %d \n', i, max_demixing_round)
+	[S, S_bg, bg_spatial] = update_spatial_lasso(processed_video, S, S_bg, T, ...
+            T_bg, bg_spatial, bg_temporal, S_mask_init,S_shell_mask_init, maxIter_NMF);        
+%
+	[T, T_bg, bg_temporal] = update_temporal_lasso(processed_video, ...
+            S, S_bg, T, T_bg, bg_spatial, bg_temporal, S_mask_init, S_shell_mask_init, maxIter_NMF);     
+    
+end
+
+save(sprintf('%s\\final_component.mat', outdir), ...
+        'S', 'S_bg', 'T', 'T_bg', 'bg_spatial', 'bg_temporal', '-v7.3')  
+%% further core-shell demxing
+disp('--------------------------background subtraction--------------------------')
+tic
+oasis_lambda = 0.02;
+oasis_g = 0.9;
+lambda_l0 = 0.01;
+neuron_trace_mat = zeros(size(T, 1), size(T, 2));
+deconvol_neuron_trace_mat = zeros(size(T, 1), size(T, 2));
+spike_mat = zeros(size(T, 1), size(T, 2));
+coefs_array = zeros(1, size(T, 1));
+
+if ~isempty(S_bg)
+    parfor i = 1 : size(S, 2)      
+        center_trace = T(i, :);
+        bg_trace = T_bg(i, :);
+        [coefs, sub_trace, ca_out, sp_out] = neuropil_coefficient_estimation_greedy(center_trace, ...
+            bg_trace, oasis_lambda, oasis_g, lambda_l0);       
+        neuron_trace_mat(i, :) = sub_trace; % there is no change of 
+        deconvol_neuron_trace_mat(i, :)  = ca_out;
+        spike_mat(i, :) = sp_out;  
+        coefs_array(i) = coefs;
+    end   
+else
+    parfor i = 1 : size(S, 2)   
+        center_trace = T(i, :);
+        [ca_out, sp_out, ~, ~, ~] = foopsi_oasisAR1(center_trace, oasis_g, oasis_lambda, false,...
+         true, 1, 100);
+        neuron_trace_mat(i, :) = center_trace; 
+        deconvol_neuron_trace_mat(i, :) = ca_out;
+        spike_mat(i, :) = sp_out;     
+    end
+    coefs_array = [];
+end
+toc
+save(fullfile(outdir, ['after_background_rejection.mat']),...
+    'neuron_trace_mat', 'deconvol_neuron_trace_mat', 'spike_mat', 'coefs_array', '-v7.3');
+figure, temporal_trace_render(neuron_trace_mat, 'k')
+
+%% 3D distributions
+figure('Name', 'video', 'position', [100, 100, 400, 300])
+plot_3D_distribution(valid_seg, [volum_size(1), volum_size(2)], [1, 2] * seed_param.pixel_size, ...
+                        seed_param.per_slice_depth * psf_param.psf_layer_position, 10) 
+savefig(sprintf('%s\\spatial_distribution_3D.fig', outdir))
 
 %% final plot: 3D neuron distributions in a video
 % with AZ changed
+%{
 avi_filename =[outdir, '\\spatial_video.avi'];
 avi_file = VideoWriter(avi_filename);
 avi_file.FrameRate = 30;
@@ -284,7 +373,7 @@ el = 19;
 figure('Name', 'video', 'position', [100, 100, 400, 300])
 for i = 1 : 1 : length(az_angle)
     clf
-	plot_3D_distribution(valid_seg_global_filt_final, [size_h, size_w], [1, 2] * pixel_size, ...
+	plot_3D_distribution(valid_seg, [volum_size(1), volum_size(2)], [1, 2] * pixel_size, ...
                         recon_param.psf_layer * per_slice_depth, 10) 
 	view(az_angle(i), el)
     
@@ -294,9 +383,9 @@ for i = 1 : 1 : length(az_angle)
    
 end
 avi_file.close();   
-
+%}
 %% final plot: temporal activity
-tmp_C = zscore(obj.C, 0, 2);
+tmp_C = zscore(T, 0, 2);
 figure, imagesc(tmp_C)
 pbaspect([1, 2, 1])
 
@@ -310,12 +399,34 @@ rectangle('Position', [zoom_in_time(1), zoom_in_neuron_id(1), ...
                 'edgecolor', color_scheme_npg(1, :), ...
                 'linestyle', '--', ...
                 'linewidth', 1)
-%%
+% zoom in
 figure('position', [1, 1, 300, 600]),
-temporal_trace_render_simple(tmp_C(zoom_in_neuron_id(1) : zoom_in_neuron_id(2), ...
+temporal_trace_render_simple(T(zoom_in_neuron_id(1) : zoom_in_neuron_id(2), ...
                          zoom_in_time(1) : zoom_in_time(2)))
 colormap('gray')
 caxis([-2, 0])
 axis off
 pbaspect([1, 2, 1])
+savefig(sprintf('%s\\temporal_trace.fig', outdir))
+
+
 %% utility function
+function out_mat_A = cell_process_A(A, movie_size) % would be slow since reach the limit
+    out_mat_A = zeros(movie_size(1) * movie_size(2) * movie_size(4), size(A, 2));
+    for i = 1 : size(A, 1) % number of component
+%         i
+       curr_A =  cell2mat(A(i, :));
+       out_mat_A(:, i) = curr_A(:);
+    end
+    out_mat_A  = sparse(out_mat_A );
+end
+function A_cell = extract_A(A_mat, movie_size)
+    A_cell = cell(size(A_mat, 1), movie_size(4));
+    
+	for i = 1 : size(A_mat, 1) % number of component
+       for j = 1 : movie_size(4) % number of view
+          curr_A = A_mat((j - 1) * movie_size(1) * movie_size(2) + 1 : j * movie_size(1) * movie_size(2), i);
+          A_cell{i, j} = sparse(reshape(curr_A, movie_size(1), movie_size(2)));
+       end
+    end
+end

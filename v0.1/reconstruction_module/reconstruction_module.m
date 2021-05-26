@@ -1,4 +1,5 @@
-function [Xguess] = reconstruction_module(psf_param, recon_param, Xguess, psf, WDF, recon_name_perfix, frame)
+function [Xguess] = reconstruction_module(psf_param, recon_param, Xguess, psf, WDF, ...
+                            recon_savepath, recon_name_perfix, frame)
 %% Reconstruction Module reconstuction with DAO
 % This program is used to reconstruct volume from wdf with digital
 % abberation optics correction
@@ -219,12 +220,12 @@ for i=1:maxIter
     
     % save (if it is too large, save as several stacks)
     if size(A,1) > 2000 && size(A,3) > 100
-        imwriteTFSK(single(A(:,:,1:round(size(A,3)/2))), ...
+        saveastiff(im2uint16(single(A(:,:,1:round(size(A,3)/2))) / max(A(:))), ...
             [recon_name_perfix,'_vid', num2str(frame),'_iter_',num2str(i),'.0.tiff']);
-        imwriteTFSK(single(A(:,:,round(size(A,3)/2)+1:end)), ...
+        saveastiff(im2uint16(single(A(:,:,round(size(A,3)/2)+1:end)) / max(A(:))), ...
             [recon_name_perfix,'_vid', num2str(frame),'_iter_',num2str(i),'.1.tiff']);
     else
-        imwriteTFSK(single(A), [recon_name_perfix,'_vid', num2str(frame),'_iter_',num2str(i),'.tiff']);
+        saveastiff(im2uint16(single(A) / max(A(:))), [recon_name_perfix,'_vid', num2str(frame),'_iter_',num2str(i),'.tiff']);
     end
 end
 

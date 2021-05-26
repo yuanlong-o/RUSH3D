@@ -1,4 +1,4 @@
-function [raw_stack_after_rr] = rotate_resize_module(preprocess_param,input_rawdata_perfix,rr_rawdata_name)
+function  [raw_stack_after_rr, total_num] = rotate_resize_module(preprocess_param,input_rawdata_perfix,rr_rawdata_name)
 %% Rotate_Resize_Module Rotate and resize the rawdata stack and save
 
 % This program is used to rotate and resize raw data in one capture (one
@@ -14,7 +14,7 @@ function [raw_stack_after_rr] = rotate_resize_module(preprocess_param,input_rawd
 % rr_rawdata_name
 
 % Output:
-% raw_stack_after_rr
+% total_num : total frame number
 % output file             save in the outdir separately in several stacks
 
 % parameter parser
@@ -27,7 +27,7 @@ rawdata_name = strcat(input_rawdata_perfix,'.',num2str(0),'.tiff');
 tmp = double(imread(rawdata_name,1));
 tmp = imrotate(tmp,pre_rotate,'bicubic');
 tmp = imresize(tmp,pre_resize,'bicubic');
-raw_stack_after_rr = zeros(size(tmp,1),size(tmp,2),large_cycle*small_cycle);
+raw_stack_after_rr = zeros(size(tmp,1),size(tmp,2),large_cycle*small_cycle, 'single');
 
 m = 1;
 for num = 0:1:large_cycle-1
@@ -39,9 +39,10 @@ for num = 0:1:large_cycle-1
         tmp = double(imread(rawdata_name,i));
         tmp = imrotate(tmp,pre_rotate,'bicubic');
         tmp = imresize(tmp,pre_resize,'bicubic');
-        raw_stack_after_rr(:,:,m) = tmp;
+        raw_stack_after_rr(:,:,m) = single(tmp);
         m = m+1;
     end
     imwriteTFSK(uint16(raw_stack_after_rr(:,:,m - small_cycle:m-1)),[rr_rawdata_name,'.', num2str(num),'.tiff']);
     disp([num2str(m),' raw data has been rr and loaded']);
 end
+total_num = m - 1;

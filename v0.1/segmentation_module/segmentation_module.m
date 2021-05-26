@@ -1,4 +1,4 @@
-function [global_A_in, global_center] = segmentation_module(curr_volume, seed_param)
+function [valid_seg_global_filt] = segmentation_module(curr_volume, img, seed_param)
 %% this module segment the reconstructed 3D image stack and output the neuron seed.
 %  last update: 5/11/2021. YZ
 
@@ -18,20 +18,25 @@ mkdir(outdir)
 
 
 % associate the reconstructions with central view.
-cut_margin = seed_param.cut_margin; 
-down_factor = seed_param.down_factor;
-
+estimate_patch_size = seed_param.estimate_patch_size;
+down_factor = seed_param.down_factor; % control ratio between wigner and global
+pixel_size=seed_param.pixel_size;
+per_slice_depth = seed_param.per_slice_depth;
 % load current image    
 
 % size
 [size_h, size_w, size_z] = size(curr_volume);
+psf_layer_position = 1 : size_z;
 patch_info_array = determine_patch_size(size_h, size_w, estimate_patch_size);
 
 %% loop for different patch
 valid_seg_array = [];
-for j = 1 : length(patch_info_array)
-    j
 
+for j = 1 : length(patch_info_array) % for lateral patches
+    j
+    curr_param = seed_param;
+    curr_param.outdir = sprintf('%s\\seg_%d', curr_param.outdir, j);
+    mkdir(curr_param.outdir )
     curr_patch_info = patch_info_array{j};
 
     % grab current patch
@@ -39,7 +44,7 @@ for j = 1 : length(patch_info_array)
                               curr_patch_info.location(1, 2) : curr_patch_info.location(2, 2), ...
                               :);
     % segmentation
-    [valid_seg, discard_seg] = neuron_segmentation_module(patch_volume , seed_param);
+    [valid_seg, discard_seg] = neuron_segmentation_module(patch_volume , curr_param);
     %%
     % apply the bias information
     if find(~cellfun(@isempty,valid_seg))
@@ -59,8 +64,9 @@ valid_seg_global= valid_seg_array;
 
 save(sprintf('%s\\valid_seg_global.mat', outdir), 'valid_seg_global')
 %% boundary filter
+% components in the boundary will be discarded
 margin_dis =100;
-
+exclude_ind = [];
 for i = 1 : size(valid_seg_global, 1)
     curr_center = mean(valid_seg_global{i, 2}, 1);
     
@@ -84,15 +90,7 @@ save(sprintf('%s\\valid_seg_global_filt.mat', outdir), 'valid_seg_global_bd_filt
 plot_3D_distribution_mod_depth_irreg(valid_seg_global_bd_filt, [size_h, size_w], [1, 2] * pixel_size,...
                                                                 psf_layer_position * per_slice_depth, 10, outdir,  'boundary_filter')
 
-
 %% blood vessel mask
-% calculate summary image
-[bg_spatial_init, bg_temporal_init] = rank_1_factorization(reshape(movie, [], movie_size_T), 10);
-bg_spatial_init = reshape(bg_spatial_init,[movie_size_h, movie_size_w]); % why imresize here?  
-std_image = compute_std_image(reshape(movie, [], movie_size_T), bg_spatial_init(:), bg_temporal_init); % also input the spatial and temporal background
-std_image = reshape(std_image, [movie_size_h, movie_size_w]);
-
-
 % run blood vessel extraction
 symmfilter = struct();
 symmfilter.sigma     = 8; % variance of DoG
@@ -105,7 +103,7 @@ asymmfilter = false;
 % image_d = imresize(image, 0.2);
 
 % Apple BCOSFIRE filter
-img = movie(:, :, 1);
+% img = movie(:, :, 1);
 img = max(img(:)) - img;
 response_stack = BCOSFIRE_lfm(img, symmfilter, asymmfilter); % only 2d here
 figure, imshow(response_stack)
@@ -121,8 +119,6 @@ saveastiff(im2uint16(response_stack_segm), sprintf('%s\\blood_vessel_mask.tiff',
 
 %% grab the center and spatial footprint in the central view stack
 
-global_A_in = sparse(zeros(movie_size_h * movie_size_w, size(valid_seg_global_bd_filt, 1)));
-global_center = [];
 exclude_ind = 0;
 for i = 1 : size(valid_seg_global_bd_filt, 1)
     i
@@ -134,27 +130,19 @@ for i = 1 : size(valid_seg_global_bd_filt, 1)
    curr_A_in = generate_Ain(curr_seg, curr_center, size_h, size_w);
    
    % do the mapping
-   if cut_margin < 0
-       % do the pad
-       curr_A_in_cut = padarray(curr_A_in, [abs(cut_margin), abs(cut_margin)], 0, 'both');
-   else
-        curr_A_in_cut = curr_A_in(cut_margin + 1 : end - cut_margin, cut_margin + 1 : end - cut_margin, :);
-   end
-   curr_A_in_cut = imresize(curr_A_in_cut, 1 / down_factor * scale_up_factor);
-   assert(size(curr_A_in_cut, 1) == movie_size_h && size(curr_A_in_cut, 2) == movie_size_w)
-   curr_center_cut = mean(curr_center(:, 1 : 2), 1);
-   curr_center_cut = (curr_center_cut - cut_margin ) / down_factor;
+   curr_center_cut = mean(curr_center(:, 1 : 2), 1); % only xy
+   curr_center_cut = curr_center_cut / down_factor;
    
     % concatenate
 
     % empty check
-    if isempty(find(curr_A_in_cut))
+    if isempty(find(curr_A_in))
        exclude_ind(i) = 1; 
     end
     
     % vessel segment check
-	if response_stack_segm(max(min(round(curr_center_cut(1)), movie_size_h), 1), ...
-                           max(min(round(curr_center_cut(2)), movie_size_w), 1)) > 0 % in the mask
+	if response_stack_segm(max(min(round(curr_center_cut(1)), size_h / down_factor), 1), ...
+                           max(min(round(curr_center_cut(2)), size_w / down_factor), 1)) > 0 % in the mask
         exclude_ind(i) = 1; % set 0 to cancel other options
     end
     
@@ -168,6 +156,6 @@ valid_seg_global_filt(find(exclude_ind), :) = [];
 plot_3D_distribution_mod_depth_irreg(valid_seg_global_filt, [size_h, size_w], [1, 2] * pixel_size,...
                     psf_layer_position * per_slice_depth, 10, outdir, 'vessel_filter')
 %
-save(sprintf('%s\\initial_A_in.mat', outdir), 'global_A_in', 'global_center',...
+save(sprintf('%s\\final_filtering.mat', outdir),...
                                     'exclude_ind', 'valid_seg_global_filt')
 end
