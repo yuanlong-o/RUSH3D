@@ -218,6 +218,8 @@ for reg_ind = 1 : reg_group
 end
 %
 saveastiff(im2uint16(std_WDF / max(std_WDF(:))), sprintf('%s\\std_view.tiff', outdir));
+% reshape the std_WDF
+std_WDF = reshape(std_WDF, size(std_WDF, 1), size(std_WDF, 2), preprocess_param.Nnum, preprocess_param.Nnum);
 %%
 % ~ 2h
 disp('---------------------------Reconstruction---------------------------');
