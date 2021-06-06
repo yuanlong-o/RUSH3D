@@ -317,6 +317,7 @@ lambda_l0 = 0.01;
 frames_step = 1;
 
 for global_patch_id = 1 : length(patch_info_array) % for lateral patches
+    fprintf('patch %d\n', global_patch_id)
     curr_outdir = sprintf('%s\\patch_%d', outdir, global_patch_id);
     mkdir(curr_outdir)
     %% volume preparation
@@ -328,7 +329,7 @@ for global_patch_id = 1 : length(patch_info_array) % for lateral patches
     
     patch_WDF = first_WDF(ceil(curr_patch_info.location(1, 1) / ds) : ceil(curr_patch_info.location(2, 1) / ds), ...
                           ceil(curr_patch_info.location(1, 2) / ds) : ceil(curr_patch_info.location(2, 2) / ds), ...
-                          :);
+                          :, :);
     %% neuron segmentation generation module
     % ~ 2h
 	center_array = [];
@@ -338,7 +339,7 @@ for global_patch_id = 1 : length(patch_info_array) % for lateral patches
     curr_seed_param.outdir = curr_outdir;
 
     valid_seg = segmentation_module(patch_volume, ...
-                                    patch_WDF(:, :, ceil(preprocess_param.Nnum^2 / 2)), ...
+                                    squeeze(patch_WDF(:, :, ceil(preprocess_param.Nnum / 2), ceil(preprocess_param.Nnum / 2))), ...
                                     curr_seed_param);
     % determine if it is an empty patch
     if find(~cellfun(@isempty,valid_seg))
