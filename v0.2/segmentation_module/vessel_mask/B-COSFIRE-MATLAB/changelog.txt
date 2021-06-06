@@ -1,0 +1,26 @@
+Delineation of blood vessels in retinal images based on combination of B-COSFIRE filters responses.
+
+VERSION 02/09/2016
+CREATED BY: George Azzopardi (1, 3), Nicola Strisciuglio (1,2), Mario Vento (2) and Nicolai Petkov (1)
+            1) University of Groningen, Johann Bernoulli Institute for Mathematics and Computer Science, Intelligent Systems
+            2) University of Salerno, Dept. of Information Eng., Electrical Eng. and Applied Math., MIVIA Lab
+	     3) Intelligent Computer Systems, University of Malta, Msida, Malta
+
+If you use this script please cite the following papers:
+  [1] "George Azzopardi, Nicola Strisciuglio, Mario Vento, Nicolai Petkov, 
+  Trainable COSFIRE filters for vessel delineation with application to retinal images, Medical Image Analysis, Volume 19 , Issue 1 , 46 - 57, ISSN 1361-8415, 
+  http://dx.doi.org/10.1016/j.media.2014.08.002"
+  [2] “N. Strisciuglio, G. Azzopardi, M. Vento, and N. Petkov” - Supervised vessel delineation in retinal fundus images with the automatic selection of B-cosfire filters. Machine Vision and Applications, doi:10.1007/s00138-016-0781-7
+
+
+CHANGELOG
+- v1.2
+    1)  Application can be called without output parameters. The B-COSFIRE filter response and the corresponding segmented image are visualized. 
+ 
+- v1.1 
+    1)  Feature for the computation of the orientation map added.
+    2)  B-COSFIRE filter configuration performed on a vertical-oriented 
+        prototype pattern as described in [1]
+
+- v1.0
+    Initial release
