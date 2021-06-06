@@ -250,14 +250,14 @@ recon_param.margin = 9; % margin overlap
 % reconstruct STD
 
 frame = 1;
-std_WDF = rot90(imresize(std_WDF, ...
+std_WDF_up = rot90(imresize(std_WDF, ...
     [floor(size(std_WDF,1)*preprocess_param.upsampling),  ...
      floor(size(std_WDF,2)*preprocess_param.upsampling)],'cubic'), ...
      2*preprocess_param.rotWDF);
  
-std_volume = ones(size(std_WDF,1),size(std_WDF,2),size(psf,5));
+std_volume = ones(size(std_WDF_up,1),size(std_WDF_up,2),size(psf,5));
 std_volume = std_volume./sum(std_volume(:)).*sum(std_volume(:))./(size(std_volume,3)*size(std_volume,4));
-std_volume = reconstruction_module(psf_param, recon_param, std_volume, psf, std_WDF, ...
+std_volume = reconstruction_module(psf_param, recon_param, std_volume, psf, std_WDF_up, ...
                                     std_recon_savepath, std_recon_name_perfix,frame);
 std_volume = double(std_volume);
 std_volume = std_volume  / max(std_volume(:));
@@ -315,7 +315,7 @@ lambda_l0 = 0.01;
 frames_step = 1;
 
 for global_patch_id = 1 : length(patch_info_array) % for lateral patches
-    curr_outdir = sprintf('%s\\patch_%d', outdir);
+    curr_outdir = sprintf('%s\\patch_%d', outdir, global_patch_id);
     mkdir(curr_outdir)
     %% volume preparation
     curr_patch_info = patch_info_array{global_patch_id};
