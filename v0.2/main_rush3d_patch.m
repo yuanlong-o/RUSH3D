@@ -345,7 +345,7 @@ for global_patch_id = 1 : length(patch_info_array) % for lateral patches
     if find(~cellfun(@isempty,valid_seg))
         % calcualte component center
         for i = 1 : size(valid_seg, 1)
-            center_array(i, :) = mean(valid_seg{i, 1}, 1);
+            center_array(i, :) = mean(valid_seg{i, 2}, 1);
         end
 
         %% seed module
