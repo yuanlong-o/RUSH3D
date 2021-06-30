@@ -585,8 +585,8 @@ for global_patch_id = 1 : length(patch_info_array) % for lateral patches
         reg_seg = seg_filtered;
         for k = 1 : size(seg_filtered, 1)
             % note each seg has multiple small patches
-            reg_seg{k, 2}(:, 1) = valid_seg{k, 2}(:, 1) + curr_patch_info.location(1, 1);
-            reg_seg{k, 2}(:, 2) = valid_seg{k, 2}(:, 2) + curr_patch_info.location(1, 2);
+            reg_seg{k, 2}(:, 1) = seg_filtered{k, 2}(:, 1) + curr_patch_info.location(1, 1);
+            reg_seg{k, 2}(:, 2) = seg_filtered{k, 2}(:, 2) + curr_patch_info.location(1, 2);
             
             reg_center(:, 1) = center_array_filtered(:, 1) + curr_patch_info.location(1, 1);
             reg_center(:, 2) = center_array_filtered(:, 2) + curr_patch_info.location(1, 2);
