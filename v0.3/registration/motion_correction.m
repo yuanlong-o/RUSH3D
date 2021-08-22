@@ -1,4 +1,4 @@
-function [Mpr, shifts, bound, option_nr] = motion_correction(Yf, d1, d2, gSig, bin_width, outdir)
+function [Mpr, shifts, bound, option_nr] = motion_correction(Yf, d1, d2, regstd_param ,outdir)
 %% this file use modules from normcorre to correct both burst motion and slow
 %  motion of the input movie.
 
@@ -6,8 +6,10 @@ function [Mpr, shifts, bound, option_nr] = motion_correction(Yf, d1, d2, gSig, b
 %  last update: 6/17/2020. YZ
 
 %% pre processing
-% gSig = 2; 
-gSiz = 3*gSig; 
+gSig = regstd_param.reg_gSig; 
+gSiz = 3*gSig;
+bin_width = regstd_param.reg_bin_width;
+
 psf = fspecial('gaussian', round(2*gSiz), gSig);
 ind_nonzero = (psf(:)>=max(psf(:,1)));
 psf = psf-mean(psf(ind_nonzero));
@@ -29,7 +31,7 @@ option_r.bin_width = bin_width; %
 option_r.grid_size = [option_r.d1, option_r.d2, 1];   % grid size
 option_r.overlap_pre = [20, 20, 1]; % size of overlapped region before upsampling
 option_r.overlap_post = [20, 20, 1]; % size of overlapped region after upsampling
-option_r.min_patch_size = [32, 32, 16]; % minimize patch size
+option_r.min_patch_size = [10,10,16];%[32, 32, 16]; % minimize patch size
 option_r.min_diff = [16, 16, 5];
 option_r.us_fac = 50; % upsampling factor
 option_r.mot_uf = [1, 1, 1];  % degree of patches upsampling (default: [4,4,1])
@@ -90,7 +92,7 @@ print(fullfile(outdir, [datestr(now, 'YYmmddTHHMM') '_rigid_registration.pdf']),
 %% non-rigid shift
 option_nr = option_r;
 option_nr.bin_width = round(bin_width / 2); % better resolution
-option_nr.grid_size = [256,256, 1];
+option_nr.grid_size = [min(floor(d1/2),256),min(floor(d1/2),256), 1];
 option_nr.mot_uf = [4, 4, 1];
 option_nr.correct_bidir = false;
 option_nr.overlap_pre = [32, 32, 1];

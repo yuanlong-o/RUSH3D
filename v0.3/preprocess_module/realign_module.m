@@ -28,8 +28,7 @@ start_frame = preprocess_param.start_frame; % the number of start frame (the fir
 frame_interval = preprocess_param.frame_interval; % interval of frame (1 by default: process frame by frame, no jump frame)
 upsampling_resize = preprocess_param.upsampling_resize;% 1 means resize WDF to 13 x 13, otherwise 0; (has a problem !!!!!)
 
-% Here we choose the center of rawdata and determine ROI, we strongly
-% recommend choose the center manually.
+
 auto_center_mode = preprocess_param.auto_center_mode; % find the center coordinate of x and y automatically when it is 1 and it will disable center_X and center_Y, otherwise 0
 auto_center_frame = preprocess_param.auto_center_frame ; % use auto_center_frame to find center automatically under the auto center mode, take the first frame (0 in c++) by default  
 center_X = preprocess_param.center_X; % the center coordinate x of Light field data (Note that the coordinate is from 0 to N-1 in c++)
@@ -40,7 +39,7 @@ Ny = preprocess_param.Ny; % take half number of microlens in y direction (total 
 conf_name = preprocess_param.conf_name; % configuration file for scanning which is corresponding to Nshift
 
 group_mode = preprocess_param.group_mode; % Mode of realign between different frame of rawdata. 0: jump mode (group1: 1-9, group2: 10-18,...); 1: slide window(group1: 1-9, group2: 2-10,...)
-group_count = preprocess_param.group_count; % the number of realigned WDF stacks
+valid_frame_num = preprocess_param.valid_frame_num; % the number of realigned WDF stacks
 
 
 realign_mode = preprocess_param.realign_mode; % realignMode for different scanning sequence (all choices: 'LZ': light path scanning (in RUSH3D). 'ZGX': stage scanning in the opposite direction from 'LZ')
@@ -55,11 +54,13 @@ if(auto_center_mode == 1) % It is not recommended
     [center_X, center_Y, ~] = AutoCenter(img, Nnum);
 end
 
+bsn = preprocess_param.bright_scale_normalize; % 1 for normalizing bright scale for each scanning period (for lym) 0 no;
+szf = preprocess_param.skip_zero_frame; % 1 for skip zero frame, 0 no;
 %% main realign command
-command = sprintf('ReAlign %d %s %s %d %d %d %d %d %d %s %d %d %d %d %s %s %d %f %f',...
+command = sprintf('ReAlign %d %s %s %d %d %d %d %d %d %s %d %d %d %d %s %s %d %f %f %d %d',...
     Nshift, realigndata_name_perfix, rawdata_name, start_frame, center_X, center_Y, Nx,...
-    group_count, group_mode, conf_name, frame_interval, upsampling_resize, Nnum, Ny, ...
-    realign_mode, centerview, rotation, slight_resize, slight_rotation);
+    valid_frame_num, group_mode, conf_name, frame_interval, upsampling_resize, Nnum, Ny, ...
+    realign_mode, centerview, rotation, slight_resize, slight_rotation, bsn, szf);
 
 system(command);
 

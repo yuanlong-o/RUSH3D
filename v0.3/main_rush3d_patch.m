@@ -1,5 +1,5 @@
-clc, clear
-close all
+clc;clear;
+close all;
 
 %% this file is the main file for the meso-sLFM calcium data processing.
 %  this pipeline contains from reading to calcium sensing.
@@ -12,6 +12,7 @@ close all
 %  last update: 6/5/2021. YZ
 %  last update: 5/23/2021. MW
 
+%% addpath
 addpath('background_rejection');
 addpath('main demixing');
 addpath('preprocess_module');
@@ -21,29 +22,8 @@ addpath('seed_generation_module');
 addpath(genpath('segmentation_module'));
 addpath(genpath('utility'));
 
-outdir = 'D:\RUSH3Dproject\RUSH3Dresult\0622\rasai148d_1_z287\\test_patch1';
-mkdir(outdir)
-
-rawdata_path = 'D:\RUSH3Dproject\RUSH3Drawdata\0622\rasai148d_1_z287'; % raw data path (before rotate, resize and rotate);
-first_file_name = 'rasai148d_1_z287_3x3_45.0ms_Full_Hardware_LaserCount1_210622144634'; % in one video or one capture, the name of first stack
-bg_file_name = 'beads_1um_2_bg_3x3_150.0ms_Full_Hardware_LaserCount1_210609000412.0';
-
-input_rawdata_perfix = [rawdata_path, '\\', first_file_name]; % the first file in one capture
-bg_rawdata_perfix = [rawdata_path, '\\', bg_file_name]; 
-
-preprocess_param.std_option = 0; % calculating standard deviation of one video and process the std data in the post pipeline when 1
-preprocess_param.video_option = 1; % realign and reconstruction one frame by one frame when 1
-
-preprocess_param.subnoise_flag = 0;
-
-preprocess_param.large_cycle = 20;  % total image number: large_cycle * small_cycle
-preprocess_param.small_cycle = 40; % In general, one stack has 40 images or less
-preprocess_param.Nnum = 15; % 15 x 15 pixels behind each microlen. This parameter do not have to change.  
-preprocess_param.Nshift = 3; % scanning for Nshift x Nshift times (all choices: 3: 3 x 3; 5: 5 x 5; 13: 13 x 13)
-preprocess_param.mul_ds_psf = 14;
-preprocess_param.rotWDF = 0;
 %% colormap
-% colormap
+
 color_scheme_npg = [...
     0.9020    0.2941    0.2078; ...
     0.3020    0.7333    0.8353; ...
@@ -56,277 +36,312 @@ color_scheme_npg = [...
     0.4941    0.3804    0.2824; ...
     0.6902    0.6118    0.5216 ];
 
-%% Rotate Resize Realign
+%% file path definition
 
-%  realign will combine the scanned image 
-%  the rotation and resize corrected data
+% output dir
+outdir = 'D:\RUSH3Dproject\RUSH3Dresult\0816\5x_br_tb_0.00_bg_0.00_lfm\test_patch';
+mkdir(outdir)
 
-disp('---------------------------Realign---------------------------');
+% rawdata dir and file name
+rawdata_path = 'D:\RUSH3Dproject\RUSH3Drawdata\0816\5x_br_tb_0.00_bg_0.00_lfm_uni_N_975_stack'; % raw data path (before rotate, resize and rotate);
+first_file_name = 'simpatch'; % in one video or one capture, the name of first stack
+input_rawdata_perfix = [rawdata_path, '\\', first_file_name]; % the first file in one capture
 
-realign_savepath = strcat(outdir, '\\', 'realign'); % realign data after realign will be saved in this folder
-realign_savename = strcat('realign_', first_file_name); % share the same file name
-realigndata_name_perfix = strcat(realign_savepath, '\\',realign_savename); 
-if ~exist(realign_savepath,'file') % output file name including folder path (Note that the folder must exist and it will not report an error when missing folder)
-    mkdir(realign_savepath);
-end
+% debg psfpath
+debg_psfpath = 'D:\RUSH3Dproject\RUSH3Dpsf\10x_lambda_488_axial_-600um_to_600um_zstep_20_NA_0.5_fml_875um_ftl_265mm_OSR_5_ds_12\psf_zmat';
 
-preprocess_param.start_frame = 600; % the number of start frame (the first number is 0, from 0 to N-1)
+preprocess_param.video_option = 1; % realign and reconstruction one frame by one frame when 1
+preprocess_param.num_rawdata = 900;
+
+
+%% Parameter setting
+%% Realign parameter
+preprocess_param.Nnum = 7; % 15 x 15 pixels behind each microlen. This parameter do not have to change.  
+preprocess_param.Nshift = 1; % scanning for Nshift x Nshift times (all choices: 3: 3 x 3; 5: 5 x 5; 13: 13 x 13)
+preprocess_param.start_frame = 0; % the number of start frame (the first number is 0, from 0 to N-1)
 preprocess_param.frame_interval = 1; % interval of frame (1 by default: process frame by frame, no jump frame)
-preprocess_param.upsampling_resize = 0;% 1 means resize WDF to 13 x 13, otherwise 0; (has a problem !!!!!)
-
 % Here we choose the center of rawdata and determine ROI, we strongly
 % recommend choose the center manually.
 preprocess_param.auto_center_mode = 0; % find the center coordinate of x and y automatically when it is 1 and it will disable center_X and center_Y, otherwise 0
-preprocess_param.auto_center_frame = preprocess_param.start_frame; % use auto_center_frame to find center automatically under the auto center mode, take the first frame (0 in c++) by default  
-
-preprocess_param.center_X = 4001; % the center coordinate x of Light field data (Note that the coordinate is from 0 to N-1 in c++)
-preprocess_param.center_Y = 3000; % the center coordinate y of Light field data (Note that the coordinate is from 0 to N-1 in c++)
-preprocess_param.Nx = 255; % take half number of microlens in x direction (total number: Nx * 2 + 1)
-preprocess_param.Ny = 196; % take half number of microlens in y direction (total number: Nx * 2 + 1) ( Nx = Ny is strongly recommended) (has a problem !!!!!)
-
-preprocess_param.conf_name = './utility/realign/3x3.conf.sk.png'; % configuration file for scanning which is corresponding to Nshift
-
+preprocess_param.conf_name = './utility/realign/1x1.conf.sk.png'; % configuration file for scanning which is corresponding to Nshift
+preprocess_param.center_X = 297; % the center coordinate x of Light field data (Note that the coordinate is from 0 to N-1 in c++)
+preprocess_param.center_Y = 297; % the center coordinate y of Light field data (Note that the coordinate is from 0 to N-1 in c++)
+preprocess_param.Nx = 40; % take half number of microlens in x direction (total number: Nx * 2 + 1)
+preprocess_param.Ny = 40; % take half number of microlens in y direction (total number: Nx * 2 + 1)
 
 preprocess_param.group_mode = 1; % Mode of realign between different frame of rawdata. 0: jump mode (group1: 1-9, group2: 10-18,...); 1: slide window(group1: 1-9, group2: 2-10,...)
-if preprocess_param.group_mode == 1
-    preprocess_param.group_count = preprocess_param.large_cycle*preprocess_param.small_cycle-preprocess_param.Nshift^2-preprocess_param.start_frame+1; % the number of realigned WDF stacks
-else
-    preprocess_param.group_count = floor((preprocess_param.large_cycle*preprocess_param.small_cycle-preprocess_param.start_frame)/preprocess_param.Nshift^2);
-end
-
-
-preprocess_param.realign_mode = 'LZ'; % realignMode for different scanning sequence (all choices: 'LZ': light path scanning (in RUSH3D). 'ZGX': stage scanning in the opposite direction from 'LZ')
-
-preprocess_param.rotation =  0; % rotate raw data clockwise (all choice: 0, 90, 180, 270)
-preprocess_param.slight_resize = 0.9991; % slight resize raw data in realign function (1 by default)
+preprocess_param.slight_resize = 1; % slight resize raw data in realign function (1 by default)
 preprocess_param.slight_rotation = 0; % slight rotate raw data in realign function (0 by default) Note that we do not recommend resize and rotate in realign module.
 
-input_rawdata_name = strcat(input_rawdata_perfix,'.0.tiff');
-% start realign
-if preprocess_param.video_option == 1
-    preprocess_param.centerview = strcat(realigndata_name_perfix,'_cv.tiff');
-    first_WDF = realign_module(preprocess_param, input_rawdata_name, realigndata_name_perfix);
-end
-
-valid_frame_num = preprocess_param.group_count;
-
-%% load PSF for multiscale
-%  reconstruction parameters
-
-psf_param.Nshift = 3; %% Scanning Times = 3 x 3
-psf_param.Nnum = 15; %% 15 x 15 pixels behind each MicroLen
-psf_param.PSF_broader = 28; %% Cut PSF each side for 276 pixels;
-psf_param.multi_flag = 0;
-
-psf_param.PSF_size = 5; %%£¨x,y,u,v,z£©---->(x,y,u,z) no meaning
-
-psf_param.psf_first_Q = 51;
-psf_param.psf_second_Q = 151;
-psf_param.psf_end = 101;
-
-if psf_param.multi_flag == 1
-    psf_param.psf_layer_position = [1 : 2 : psf_param.psf_first_Q, psf_param.psf_first_Q+1 : 1 : psf_param.psf_second_Q, psf_param.psf_second_Q+2 : 2 : psf_param.psf_end];
-    psf_param.first_index = find(psf_param.psf_layer_position == psf_param.psf_first_Q);
-    psf_param.second_index = find(psf_param.psf_layer_position == psf_param.psf_second_Q);
-else
-    z_mid_slice_half = 200/20;
-    psf_param.psf_layer_position = 1:1: psf_param.psf_end;
-    psf_param.first_index = (psf_param.psf_end+1)*0.5-z_mid_slice_half-1;
-    psf_param.second_index = (psf_param.psf_end+1)*0.5+z_mid_slice_half;
-end
-
-psfpath = 'D:\RUSH3Dproject\RUSH3Dpsf\5.6509x_axial_-1000um_to_1000um_zstep_20_NA_0.5um_fml_393.3um_ftl_265mm_OSR_5_ds_14\psf_zmat';
-
-[psf, psf_param] = psf_load_module(psf_param,psfpath);
-
-vid_recon_mul_savepath = strcat(outdir, '\\','vid_recon_mul'); 
-vid_debg_mul_savepath = strcat(outdir, '\\','vid_mul'); 
-if ~exist(vid_recon_mul_savepath,'file') % output file name including folder path (Note that the folder must exist and it will not report an error when missing folder)
-    mkdir(vid_recon_mul_savepath);
-end
-
-if ~exist(vid_debg_mul_savepath,'file') % output file name including folder path (Note that the folder must exist and it will not report an error when missing folder)
-    mkdir(vid_debg_mul_savepath);
-end
-%% multiscale detrending
-disp('---------------------------multiscale detrending---------------------------');
-global bg_ratio
-bg_ratio = gpuArray.zeros(psf_param.Nnum,psf_param.Nnum,'single');
-for frame_i = 1 : valid_frame_num % time dimension
-    tic;
-
-    curr_video = loadtiff(sprintf('%s_No%d.tif', realigndata_name_perfix, frame_i - 1));
-    curr_video = single(curr_video);
-
-    % multiscale sub ground noise
-    curr_video = sub_mul_bg_module(psf,psf_param,preprocess_param,curr_video,...
-        vid_recon_mul_savepath,vid_debg_mul_savepath,first_file_name,frame_i-1);
-    
-    tt = toc;
-    fprintf('%d frame is done, take %.2fs\n',frame_i,tt);
-end
-clear global bg_ratio;
-%% registration and std and multiscale substract ground
-disp('---------------------------Registration---------------------------');
-reg_path = sprintf('%s\\reg_path', outdir);
-mkdir(reg_path)
-reg_gSig = 5;
-reg_bin_width = 200;
-single_img_size = 0.5 / 225 * 80; % in single, gigabite
-memory_limt = 0.8e3; % in GB, depent on different PCs
-% based on the ram size, decide the cutting
-estimate_view_num = memory_limt / ((size(first_WDF, 1) * size(first_WDF, 2)) / 6e3 / 8e3 * valid_frame_num * single_img_size );
-estimate_view_num = floor(estimate_view_num);
-
-% registration in a spiral manner
-[i_index, j_index] = gen_spiral_center(preprocess_param.Nnum);
-i_index = i_index(end : -1 : 1);
-j_index = j_index(end : -1 : 1);
-reg_group = ceil(preprocess_param.Nnum * preprocess_param.Nnum / estimate_view_num);
-
-% std
-maxIter = 10;
-max_value = 0;
-count_ind = 1;
-
-
-%%
-std_WDF = zeros(size(first_WDF, 1), size(first_WDF, 2), preprocess_param.Nnum^2);
-for reg_ind = 1 : reg_group
-    curr_view_group_i = i_index((reg_ind - 1) * estimate_view_num + 1: min(reg_ind * estimate_view_num, preprocess_param.Nnum^2));
-    curr_view_group_j = j_index((reg_ind - 1) * estimate_view_num + 1: min(reg_ind * estimate_view_num, preprocess_param.Nnum^2));
-    
-    % read each of the realigned movie
-    processed_video = zeros(size(first_WDF, 1), size(first_WDF, 2), valid_frame_num, length(curr_view_group_i), 'single');
-    for frame_i = 1 : valid_frame_num % time dimension
-        if mod(frame_i, 10) == 0
-           fprintf('%d in %d frames collected \n', frame_i, valid_frame_num ) 
-        end
-        name_perfix = strcat(vid_debg_mul_savepath,'\\wdf_debg_vid');
-        curr_video = loadtiff(sprintf('%s_%d.tif',name_perfix, frame_i - 1));
-        curr_video = single(curr_video) / 65535;
-        
-        % multiscale sub ground noise
-        curr_video = sub_mul_bg_module(psf,psf_param,preprocess_param,curr_video,...
-            vid_recon_mul_savepath,vid_debg_mul_savepath,first_file_name,frame_i-1);
-        
-        
-        
-        for view_ind = 1 : length(curr_view_group_i) % number of specified wigner
-            buf_ind = sub2ind([preprocess_param.Nnum, preprocess_param.Nnum], ...
-                               curr_view_group_i(view_ind), curr_view_group_j(view_ind));
-            processed_video(:, :, frame_i, view_ind) = curr_video(:, :, buf_ind);
-        end
-    end
-    
-    %% do registration
-    % ~ 1h
-    if reg_ind == 1
-        central_video = processed_video(:, :, :, 1);
-        [d1,d2, ~] = size(central_video);
-        [~, shifts, bound, option_r] = motion_correction(central_video, d1, d2,reg_gSig, ...
-            reg_bin_width, outdir);
-        max_value = max(central_video(:)); % note this max_value is not updated
-    end
-    
-    %% apply the registration and calculate std
-    for view_ind = 1 : length(curr_view_group_i)
-        fprintf('%d in %d view registered \n', count_ind, preprocess_param.Nnum^2)
-        curr_video = processed_video(:, :, :, view_ind);
-        curr_video = apply_shifts(curr_video, shifts, option_r, bound/2, bound/2);
-        
-        % save
-        buf_ind = sub2ind([preprocess_param.Nnum, preprocess_param.Nnum], ...
-            curr_view_group_i(view_ind), curr_view_group_j(view_ind));
-        
-        saveastiff(imresize(im2uint16(curr_video / max_value / 5),1/4), sprintf('%s\\reg_view_%d.tiff', reg_path, buf_ind));
-        
-        % calculate std
-        [curr_bg_spatial, curr_bg_temporal] = rank_1_NMF(reshape(curr_video, [], size(curr_video,3)), maxIter);
-        curr_std_image = compute_std_image(reshape(curr_video, [], size(curr_video,3)), ...
-            curr_bg_spatial(:), curr_bg_temporal);
-        std_WDF(:, :, buf_ind) = reshape(curr_std_image, [size(curr_video , 1), size(curr_video , 2)]);
-        count_ind = count_ind + 1;
-    end
-    
-end
-%
-saveastiff(im2uint16(std_WDF / max(std_WDF(:))), sprintf('%s\\std_view.tiff', outdir));
-% reshape the std_WDF
-std_WDF = reshape(std_WDF, size(std_WDF, 1), size(std_WDF, 2), preprocess_param.Nnum, preprocess_param.Nnum);
-std_WDF = permute(std_WDF,[1,2,4,3]);
-%% psf parameters
-%  reconstruction parameters
-disp('---------------------------load psf---------------------------')
-psf_param.M = 5.6509; %% Magnification = 3.17
-psf_param.Nshift = 3; %% Scanning Times = 3 x 3
-psf_param.Nnum = 15; %% 15 x 15 pixels behind each MicroLen
-psf_param.PSF_broader = 64; %% Cut PSF each side for 276 pixels;
-psf_param.PSF_size = 5; %%£¨x,y,u,v,z£©---->(x,y,u,z) no meaning
-psf_param.downsampling_rate = 1; %% Downsampling rate for PSF
-psf_param.psf_first_Q = 51;
-psf_param.psf_second_Q = 152;
-psf_param.psf_end = 101;
-psf_param.pixel_size = 4.6e-6/psf_param.M;
-psf_param.multi_flag = 0;
-
-if psf_param.multi_flag == 1
-    psf_param.psf_layer_position = [1 : 2 : psf_param.psf_first_Q, psf_param.psf_first_Q+1 : 1 : psf_param.psf_second_Q, psf_param.psf_second_Q+2 : 2 : psf_param.psf_end];
-else
-    psf_param.psf_layer_position = 1:1: psf_param.psf_end;
-end
-
-psf_param.per_slice_depth = 4e-6;
-
-psfpath = 'D:\RUSH3Dproject\RUSH3Dpsf\5.6509x_axial_-200um_to_200um_zstep_4_NA_0.5um_fml_393.3um_ftl_265mm_OSR_5\psf_zmat';
-
-[psf, psf_param] = psf_load_module(psf_param,psfpath);
-%%
-frame = 0;
-wdf_size = size(std_WDF);
-
-preprocess_param.downsampling_rate = 1;
-preprocess_param.upsampling = preprocess_param.Nnum / preprocess_param.Nshift / preprocess_param.downsampling_rate;
-preprocess_param.rotWDF = 0; %% no meaning
+preprocess_param.rotation =  0; % rotate raw data clockwise (all choice: 0, 90, 180, 270)
+preprocess_param.upsampling_resize = 0; % 1 means resize WDF to 13 x 13, otherwise no resize; 
+preprocess_param.realign_mode = 'LZ'; % realignMode for different scanning sequence (all choices: 'LZ': light path scanning (in RUSH3D). 'ZGX': stage scanning in the opposite direction from 'LZ')
+preprocess_param.bright_scale_normalize = 0; % 1 for normalizing bright scale for each scanning period (for lym) 0 no;
+preprocess_param.skip_zero_frame = 0; % 1 for skip zero frame, 0 no;
+%% Multiscale detrending parameter
+debgrecon_param.mul_ds_psf = 12; % down sample rate of psf is 12
+debgrecon_param.PSF_broader = 12; % cut psf 12 pixel for each side (four sides)
+debgrecon_param.multi_flag = 0; % 0 for no multi axial psf 
+debgrecon_param.psf_end = 61; % psf axial number
+debgrecon_param.zstep = 20; % dz (um)
+debgrecon_param.zhalf_range = 120; % half z range (um) 
+debgrecon_param.writemode = 2; % 0: no output, 2: output last iteration, 1: ouput all result
+debgrecon_param.dispmode = 0; % 0: no disp, 1: disp
+debgrecon_param.Nbx = 1;
+debgrecon_param.Nby = 1; % Block apart 5 x 5 pieces when DAO
+debgrecon_param.maxIter = 1 ; % Max iteration times: 2 or 3 is enough
+debgrecon_param.angle_range = 8; % About 25 Angle views within the iteration
+debgrecon_param.AOstar = 1; % 1 for DAO; 0 for no DAO
+debgrecon_param.defocus = 1; % 1 for defocus, 0 for no defocus
+debgrecon_param.threshhold = 25; % Shift should not be allowed to exceed [-25,25]
+debgrecon_param.margin = 9; % margin overlap
+debgrecon_param.mchannel = 1; % number of channel
+%% Registration and std parameter
+regstd_param.reg_gSig = 2;
+regstd_param.reg_bin_width = 20;
+regstd_param.rankdetrending = 1;
+regstd_param.maxIter = 10;
+%% Reconstruction parameter
+recon_param.PSF_broader = 50; %% Cut PSF each side for 276 pixels;
+recon_param.downsampling_rate = 1; %% Downsampling rate for PSF
+recon_param.psf_end = 101;
+recon_param.downsampling_rate = 1;
+recon_param.multi_flag = 0;
 
 recon_param.writemode = 1;
 recon_param.dispmode = 1;
 recon_param.Nbx = 1;
 recon_param.Nby = 1; % Block apart 1 x 1 pieces when DAO
-
 recon_param.num_block = 1 ; % Axial block for 10 when forword propagate
-recon_param.maxIter = 2 ; % Max iteration times: 2 or 3 is enough
+recon_param.maxIter = 3 ; % Max iteration times: 2 or 3 is enough
 recon_param.angle_range = 20; % About 25 Angle views within the iteration
-
-
-recon_param.AOstar = 1; % 1 for DAO; 0 for no DAO
-recon_param.defocus = 1; % 1 for defocus, 0 for no defocus
+recon_param.AOstar = 0; % 1 for DAO; 0 for no DAO
+recon_param.defocus = 0; % 1 for defocus, 0 for no defocus
 recon_param.threshhold = 25; % Shift should not be allowed to exceed [-25,25]
 recon_param.margin = 9; % margin overlap
+
+recon_param.patchx = 1;
+recon_param.patchy = 1;
+recon_param.side = 0;
+
+% this three parameter is not used in reconstruction but use in calcium extraction
+recon_param.pixel_size = 4.6e-6/10; 
+recon_param.per_slice_depth = 4e-6;
 recon_param.estimate_patch_size = 700;
+%% Realign
+%  realign will combine the scanned image 
+%  the rotation and resize corrected data
+disp('---------------------------Realign---------------------------');
 
-recon_param.pixel_size = 1.2e-6; % lateral pixel size
-recon_param.per_slice_depth = 4e-6; % axial slice depth range
+% save folder and file name
+realign_savepath = strcat(outdir, '\\', 'realign'); 
+realign_savename = strcat('realign_', first_file_name); 
+realigndata_name_perfix = strcat(realign_savepath, '\\',realign_savename); 
+if ~exist(realign_savepath,'file') 
+    mkdir(realign_savepath);
+end
 
-recon_param.patchx = 5;
-recon_param.patchy = 7;
-recon_param.side = 29;
-recon_param.patch_side = recon_param.side *  preprocess_param.upsampling;
+if preprocess_param.group_mode == 1
+    preprocess_param.valid_frame_num = preprocess_param.num_rawdata - preprocess_param.Nshift^2 - preprocess_param.start_frame + 1; 
+else
+    preprocess_param.valid_frame_num = floor((preprocess_param.num_rawdata-preprocess_param.start_frame)/preprocess_param.Nshift^2);
+end
 
+input_rawdata_name = strcat(input_rawdata_perfix,'.0.tiff');
+preprocess_param.auto_center_frame = preprocess_param.start_frame; % use auto_center_frame to find center automatically under the auto center mode, take the first frame (0 in c++) by default  
+preprocess_param.centerview = strcat(realigndata_name_perfix,'_cv.tiff');
+
+% start realign
+tic;
+first_WDF = realign_module(preprocess_param, input_rawdata_name, realigndata_name_perfix);
+t_realign = toc;
+fprintf('Realign process done and it takes %.2f secs\n',t_realign);
+
+
+%% multiscale de background
+% load large range low resolution psf
+disp('---------------------------load low resolution psf for de background---------------------------');
+
+debgrecon_param.Nshift = preprocess_param.Nshift; 
+debgrecon_param.Nnum = preprocess_param.Nnum; 
+
+z_mid_slice_half = debgrecon_param.zhalf_range/debgrecon_param.zstep;
+debgrecon_param.psf_layer_position = 1:1: debgrecon_param.psf_end;
+debgrecon_param.first_index = (debgrecon_param.psf_end+1)*0.5-z_mid_slice_half-1;
+debgrecon_param.second_index = (debgrecon_param.psf_end+1)*0.5+z_mid_slice_half;
+
+% load start
+tic;
+[psf, debgrecon_param] = psf_load_module(debgrecon_param,debg_psfpath);
+t_load_lowrespsf = toc;
+fprintf('load low resolution psf process done and it takes %.2f secs\n',t_load_lowrespsf);
+
+
+% multiscale detrending
+disp('---------------------------multiscale detrending---------------------------');
+
+vid_recon_mul_savepath = sprintf('%s\\vid_recon_mul',outdir); 
+vid_debg_mul_savepath = sprintf('%s\\vid_mul',outdir); 
+vid_debg_mul_video_savepath = sprintf('%s\\vid_mul_video',outdir);
+
+% output file name including folder path (Note that the folder must exist and it will not report an error when missing folder)
+if ~exist(vid_recon_mul_savepath,'file') 
+    mkdir(vid_recon_mul_savepath);
+end
+
+if ~exist(vid_debg_mul_savepath,'file') 
+    mkdir(vid_debg_mul_savepath);
+end
+
+if ~exist(vid_debg_mul_video_savepath,'file') 
+    mkdir(vid_debg_mul_video_savepath);
+end
+
+% calculate byte
+single_size = size(first_WDF,1)*size(first_WDF,2)*16/8/(1024*1024);
+debgrecon_param.maxframe = 4*1024/single_size;
+maxframe = debgrecon_param.maxframe;
+
+% generate view vector in sprial order 
+[u_index, v_index] = gen_spiral_center(preprocess_param.Nnum);
+u_index = u_index(end : -1 : 1);
+v_index = v_index(end : -1 : 1);
+
+global bg_ratio
+bg_ratio = gpuArray.zeros(debgrecon_param.Nnum,debgrecon_param.Nnum,debgrecon_param.mchannel,'single');
+
+%start de background
+t_debg_start = clock;
+for channel = 1: debgrecon_param.mchannel
+    for frame_i = channel : debgrecon_param.mchannel: preprocess_param.valid_frame_num
+        tic;
+        view_video = loadtiff(sprintf('%s_No%d.tif', realigndata_name_perfix, frame_i - 1));
+        view_video = single(view_video);
+        
+        % multiscale sub ground noise
+        view_video = sub_mul_bg_module(psf,debgrecon_param,view_video,...
+            vid_recon_mul_savepath,vid_debg_mul_savepath,first_file_name,frame_i-1,channel-1);
+        
+        % save
+        count = 0;
+        for view_id = 1:length(u_index)
+            view_ind = sub2ind([preprocess_param.Nnum,preprocess_param.Nnum],u_index(view_id),v_index(view_id));
+            if mod((frame_i-channel),maxframe) == 0
+                count = count + 1;
+                savegroup = floor((count-1)/(debgrecon_param.mchannel*length(u_index)))+1;
+                imwrite(im2uint16(view_video(:,:,view_ind)/65535),strcat(vid_debg_mul_video_savepath,'\\',...
+                    'mul_video_view',num2str(view_ind),'_ch',num2str(channel),'_g',num2str(savegroup),'.tiff'));
+            else
+                imwrite(im2uint16(view_video(:,:,view_ind)/65535),strcat(vid_debg_mul_video_savepath,'\\',...
+                    'mul_video_view',num2str(view_ind),'_ch',num2str(channel),'_g',num2str(savegroup),'.tiff'),'WriteMode','append');
+            end
+        end
+        
+        
+        tt = toc;
+        fprintf('%d frame is done, take %.2fs\n',frame_i,tt);
+    end
+end
+t_debg = etime(clock,t_debg_start);
+fprintf('Debg process done and it takes %.2f secs\n',t_debg);
+debgrecon_param.savegroup = savegroup;
+clear global bg_ratio;
+clear psf;
+
+%% Registration and STD
+disp('---------------------------Registration---------------------------');
+
+reg_savepath = sprintf('%s\\reg_path', outdir);
+if ~exist(reg_savepath,'file')
+    mkdir(reg_savepath);
+end
+
+t_regstd_start = clock; 
+
+[u_index, v_index] = gen_spiral_center(preprocess_param.Nnum);
+u_index = u_index(end : -1 : 1);
+v_index = v_index(end : -1 : 1);
+   
+std_WDF = zeros(size(first_WDF, 1), size(first_WDF, 2), preprocess_param.Nnum^2);
+
+for ch_id = 1 : debgrecon_param.mchannel
+    
+    tic;
+    % measure shift
+    cv_ind = sub2ind([preprocess_param.Nnum,preprocess_param.Nnum],u_index(1),v_index(1));
+    centerview_video = [];
+    for g_id = 1 : debgrecon_param.savegroup
+        centerview_video = cat(3,centerview_video,double(loadtiff(sprintf('%s\\mul_video_view%d_ch%d_g%d.tiff',vid_debg_mul_video_savepath,cv_ind,ch_id,g_id))));
+    end
+    [d1,d2, ~] = size(centerview_video);
+    [~, shifts, bound, option_r] = motion_correction(centerview_video, d1, d2, regstd_param, outdir);
+    t_ms = toc;
+    fprintf('measure shift process done and it takes %.2f secs\n',t_ms);
+    
+    % apply shift for each angle
+    for view_id = 1 : length(u_index)
+        tic;
+        % apply shift
+        view_ind = sub2ind([preprocess_param.Nnum,preprocess_param.Nnum],u_index(view_id),v_index(view_id));
+        view_video = double(loadtiff(sprintf('%s\\mul_video_view%d_ch%d.tiff',vid_debg_mul_video_savepath,view_ind,ch_id)));
+        view_video = apply_shifts(view_video, shifts, option_r, bound/2, bound/2);
+        
+        % save
+        imwriteTFSK(im2uint16(view_video/65535),sprintf('%s\\reg_view_%d.tiff', reg_savepath, view_ind));
+        
+        % calculate std
+        maxIter = regstd_param.maxIter;
+        if regstd_param.rankdetrending == 1
+            [curr_bg_spatial, curr_bg_temporal] = rank_1_NMF(reshape(view_video, [], size(view_video,3)), maxIter);
+            curr_std_image = compute_std_image(reshape(view_video, [], size(view_video,3)), ...
+                curr_bg_spatial(:), curr_bg_temporal);
+        else
+            curr_std_image = compute_std_image(reshape(view_video, [], size(view_video,3)));
+        end
+        std_WDF(:, :, view_ind) = reshape(curr_std_image, [size(view_video , 1), size(view_video , 2)]);
+        t_onereg = toc;
+        fprintf('%d in %d view has been registered and std and it takes %.2f secs\n', view_id, preprocess_param.Nnum^2, t_onereg);
+    end
+end
+% save std
+saveastiff(im2uint16(std_WDF / max(std_WDF(:))), sprintf('%s\\std_%s%d.tif', outdir, first_file_name,0));
+% reshape to 4D
+std_WDF = reshape(std_WDF, size(std_WDF, 1), size(std_WDF, 2), preprocess_param.Nnum, preprocess_param.Nnum);
+std_WDF = permute(std_WDF,[1,2,4,3]);
+std_WDF = max(std_WDF,50);
+t_regstd = etime(clock,t_regstd_start);
+fprintf('resgistration process done and it takes %.2f secs\n',t_regstd);
+
+%% Reconstruction
+% load psf
+disp('---------------------------load psf---------------------------')
+
+recon_param.Nshift = preprocess_param.Nshift; %% Scanning Times = 3 x 3
+recon_param.Nnum = preprocess_param.Nnum; %% 15 x 15 pixels behind each MicroLen
+recon_param.psf_layer_position = 1:1: recon_param.psf_end;
+
+recon_psfpath = 'D:\RUSH3Dproject\RUSH3Dpsf\10x_lambda_488_axial_-200um_to_200um_zstep_4_NA_0.5_fml_875um_ftl_265mm_OSR_5\psf_zmat';
+[psf, recon_param] = psf_load_module(recon_param,recon_psfpath);
+recon_param.upsampling = recon_param.Nnum / recon_param.Nshift / recon_param.downsampling_rate;
+
+recon_param.patch_side = recon_param.side *  recon_param.upsampling;
 recon_param.patchnum = recon_param.patchx * recon_param.patchy;
 
+% only reconstruct one frame
+frame = 0;
+wdf_size = size(std_WDF);
+
+% separate whole WDF into small patch with overlap
 index_id_x = round(linspace(recon_param.side+1,wdf_size(1)+1-recon_param.side,recon_param.patchx+1));
 index_id_y = round(linspace(recon_param.side+1,wdf_size(2)+1-recon_param.side,recon_param.patchy+1));
-
-
 x_start = index_id_x(1)-recon_param.side;
 x_end   = index_id_x(2)-1+recon_param.side;
 y_start = index_id_y(1)-recon_param.side;
 y_end   = index_id_y(2)-1+recon_param.side;
 std_WDF_sub = std_WDF(x_start:x_end,y_start:y_end,:,:);
-std_WDF_up = rot90(imresize(std_WDF_sub, ...
-    [floor(size(std_WDF_sub,1)*preprocess_param.upsampling/2)*2+1,...
-    floor(size(std_WDF_sub,2)*preprocess_param.upsampling/2)*2+1],'cubic'),2*preprocess_param.rotWDF);
+std_WDF_up = imresize(std_WDF_sub, ...
+    [floor(size(std_WDF_sub,1)*recon_param.upsampling/2)*2+1,...
+    floor(size(std_WDF_sub,2)*recon_param.upsampling/2)*2+1],'cubic');
 
 size_xsub_p = size(std_WDF_up,1);
 size_ysub_p = size(std_WDF_up,2);
@@ -347,41 +362,39 @@ for patch_idx = 1: recon_param.patchx
         y_end   = index_id_y(patch_idy+1)-1+recon_param.side;
         
         std_WDF_sub = std_WDF(x_start:x_end,y_start:y_end,:,:);
-        %% reconstruct with normal deconvolution
         
+        % reconstruct with normal deconvolution
         disp(['--------reconstruction (',num2str(patch_id),...
                                     '/',num2str(recon_param.patchnum),')---------']);
-
-        
-        
-        
-        std_recon_savepath = strcat(outdir, '\\','std_recon_seperate', '\\','patchid_',num2str(patch_id)); % realign data after realign will be saved in this folder
-        std_recon_savename = strcat('std_recon_', first_file_name); % share the same file name
+                                
+        % output file name including folder path (Note that the folder must exist and it will not report an error when missing folder)
+        std_recon_savepath = strcat(outdir, '\\','std_recon_seperate', '\\','patchid_',num2str(patch_id)); 
+        std_recon_savename = strcat('std_recon_', first_file_name); 
         std_recon_name_perfix = strcat(std_recon_savepath,'\\', std_recon_savename);
-        if ~exist(std_recon_savepath,'file') % output file name including folder path (Note that the folder must exist and it will not report an error when missing folder)
+        if ~exist(std_recon_savepath,'file') 
             mkdir(std_recon_savepath);
         end
-
-        std_WDF_up = rot90(imresize(std_WDF_sub, ...
-            [floor(size(std_WDF_sub,1)*preprocess_param.upsampling/2)*2+1,...
-            floor(size(std_WDF_sub,2)*preprocess_param.upsampling/2)*2+1],'cubic'),2*preprocess_param.rotWDF);
+        std_WDF_up = imresize(std_WDF_sub, ...
+            [floor(size(std_WDF_sub,1)*recon_param.upsampling/2)*2+1,...
+            floor(size(std_WDF_sub,2)*recon_param.upsampling/2)*2+1],'cubic');
         std_volume_patch = ones(size(std_WDF_up,1),size(std_WDF_up,2),size(psf,5));
         std_volume_patch = std_volume_patch./sum(std_volume_patch(:)).*sum(std_volume_patch(:))./(size(std_volume_patch,3)*size(std_volume_patch,4));      
-        std_volume_patch = reconstruction_module(psf_param, recon_param, std_volume_patch, psf, std_WDF_up, std_recon_name_perfix, frame);
+        std_volume_patch = reconstruction_module(recon_param, std_volume_patch, psf, std_WDF_up, std_recon_name_perfix, frame);
         
         std_volume((patch_idx-1)*size_xsub+1:(patch_idx)*size_xsub,(patch_idy-1)*size_ysub+1:(patch_idy)*size_ysub,:) ...
             = std_volume_patch(recon_param.patch_side+1:size_xsub_p-recon_param.patch_side,...
             recon_param.patch_side+1:size_ysub_p-recon_param.patch_side,:);
-        
     end
 end
+% slight resize std_volumn
+first_WDF_cut_side = first_WDF(recon_param.side+1:end-recon_param.side,recon_param.side+1:end-recon_param.side,:,:);
+std_volume = imresize(std_volume,[size(first_WDF_cut_side,1)*recon_param.upsampling,size(first_WDF_cut_side,2)*recon_param.upsampling]);
+% save std reconstruction result
 std_recon_savepath = strcat(outdir, '\\','std_recon_seperate');
-imwriteTFSK(uint16(std_volume/max(std_volume(:))*65535),strcat(std_recon_savepath,'\\','whole_patch.tiff')); % -- ----- pp
+imwriteTFSK(uint16(std_volume/max(std_volume(:))*65535),strcat(std_recon_savepath,'\\','whole_patch.tiff'));
 std_volume = double(std_volume);
 std_volume = std_volume  / max(std_volume(:));
 
-first_WDF_cut_side = first_WDF(recon_param.side+1:end-recon_param.side,recon_param.side+1:end-recon_param.side,:,:);
-std_volume = imresize(std_volume,[size(first_WDF_cut_side,1)*preprocess_param.upsampling,size(first_WDF_cut_side,2)*preprocess_param.upsampling]);
 %% start processing patch
 % --------------------patch preparation--------------------
 estimate_patch_size = round(size(std_volume, 2) / 2);
@@ -389,7 +402,7 @@ estimate_patch_size = round(size(std_volume, 2) / 2);
                 estimate_patch_size, preprocess_param.Nnum);
 
 % --------------------std parameters--------------------
-diff_psf_layer_position = diff(psf_param.psf_layer_position);
+diff_psf_layer_position = diff(recon_param.psf_layer_position);
 buf = find(diff_psf_layer_position == 1);
 start_ind = buf(1);
 end_ind = buf(end);
@@ -400,9 +413,9 @@ volum_size_cut = [size(std_volume_cut, 1), size(std_volume_cut, 2), size(std_vol
 
 % --------------------segmentation parameters--------------------
 seed_param.outdir = outdir;
-seed_param.per_slice_depth = psf_param.per_slice_depth;
+seed_param.per_slice_depth = recon_param.per_slice_depth;
 seed_param.estimate_patch_size = 700;
-seed_param.pixel_size = psf_param.pixel_size; % lateral pixel size
+seed_param.pixel_size = recon_param.pixel_size; % lateral pixel size
 seed_param.down_factor = preprocess_param.Nnum / preprocess_param.Nshift;
 
 seed_param.neuron_number = 140;
@@ -472,24 +485,24 @@ for global_patch_id = 1 : length(patch_info_array) % for lateral patches
         % generate seed template for iterations
         disp('--------------------------Iteration preparation--------------------------')
         % define wigners that is usefull
-        specify_wigner = [ceil(psf_param.Nnum / 2), ceil(psf_param.Nnum / 2)];
+        specify_wigner = [ceil(recon_param.Nnum / 2), ceil(recon_param.Nnum / 2)];
         for i = 1 : 4
             [u, v] = ind2sub([2, 2], i);
-            buf = [ceil(psf_param.Nnum / 2) + (-1)^u * ceil(psf_param.Nnum / 4),...
-                   ceil(psf_param.Nnum / 2) + (-1)^v * ceil(psf_param.Nnum / 4)];
+            buf = [ceil(recon_param.Nnum / 2) + (-1)^u * ceil(recon_param.Nnum / 4),...
+                   ceil(recon_param.Nnum / 2) + (-1)^v * ceil(recon_param.Nnum / 4)];
             specify_wigner = [specify_wigner ; buf];
         end
 
         % generate 2d initialized seed
         [S_init, S_shell_init,S_mask_init, S_shell_mask_init] = seed_generation_module(psf(:, :, :, :, start_ind : end_ind), ...
-                                                                        psf_param, valid_seg, ...
+                                                                        recon_param, valid_seg, ...
                                                                         patch_volum_size_cut, ...
                                                                         specify_wigner, shell_radius);
 
         %% prepare iteration video
         % ~ 2h  
         [processed_video] = iteration_preparation_patch(reg_path, valid_frame_num, specify_wigner, ...
-                                                        curr_patch_info, psf_param, S_init);
+                                                        curr_patch_info, recon_param, S_init);
 
         % background component initialization
         [bg_spatial_init, bg_temporal_init] = initialize_bg(processed_video, bg_iter);
@@ -611,7 +624,7 @@ save(fullfile(outdir, ['global_output.mat']),...
 %% 3D distributions
 figure('Name', 'video', 'position', [100, 100, 400, 300])
 plot_3D_distribution(global_seg, [volum_size_cut(1), volum_size_cut(2)], [1, 2] * seed_param.pixel_size, ...
-                        seed_param.per_slice_depth * psf_param.psf_layer_position, 10) 
+                        seed_param.per_slice_depth * recon_param.psf_layer_position, 10) 
 savefig(sprintf('%s\\spatial_distribution_3D.fig', outdir))
 
 %% final plot: 3D neuron distributions in a video

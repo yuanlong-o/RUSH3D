@@ -1,4 +1,4 @@
-function [Xguess] = reconstruction_module(psf_param, recon_param, Xguess, psf, WDF, ...
+function [Xguess] = reconstruction_module(recon_param, Xguess, psf, WDF, ...
                             recon_name_perfix, frame)
 %% Reconstruction Module reconstuction with DAO
 % This program is used to reconstruct volume from wdf with digital
@@ -20,7 +20,7 @@ function [Xguess] = reconstruction_module(psf_param, recon_param, Xguess, psf, W
 % output file        map_waveshape and Xguess
 
 
-Nnum = psf_param.Nnum;
+Nnum = recon_param.Nnum;
 writemode = recon_param.writemode;
 dispmode = recon_param.dispmode;
 angle_range = recon_param.angle_range; % About 25 Angle views within the iteration
@@ -38,7 +38,7 @@ margin = recon_param.margin; % margin overlap
 weight = squeeze(sum(sum(sum(WDF,1),2),5));
 for i = 1:Nnum
     for j = 1:Nnum
-        if  ((i-8)^2 + (1.667)*(j-8)^2 > angle_range)
+        if  ((i-ceil(Nnum/2))^2+(j-ceil(Nnum/2))^2)>angle_range
             weight(i,j) = 0;
         end
     end
@@ -62,11 +62,11 @@ for i=1:maxIter
         borderx=round((size(WDF,1)-N3*Nbx)/2);
         bordery=round((size(WDF,2)-N3*Nby)/2);
         [coordinate1,coordinate2]=meshgrid(1:size(WDF,2),1:size(WDF,1));
-        x = -7:7;
+        x = -floor(Nnum/2):floor(Nnum/2);
         [Sx,Sy]=meshgrid(x,x);
         for u=1:Nnum
             for v=1:Nnum
-                if ((u-8)^2+(v-8)^2)>angle_range
+                if ((u-ceil(Nnum/2))^2+(v-ceil(Nnum/2))^2)>angle_range
                     Sx(u,v)=0;
                     Sy(u,v)=0;
                 end
@@ -116,7 +116,7 @@ for i=1:maxIter
             
             for uu=1:Nbx
                 for vv=1:Nby
-                    cx=map_wavshape(8,8,uu,vv,1);cy=map_wavshape(8,8,uu,vv,2);
+                    cx=map_wavshape(ceil(Nnum/2),ceil(Nnum/2),uu,vv,1);cy=map_wavshape(ceil(Nnum/2),ceil(Nnum/2),uu,vv,2);
                     map_wavshape(:,:,uu,vv,1)=(squeeze(map_wavshape(:,:,uu,vv,1))-cx).*mask;
                     map_wavshape(:,:,uu,vv,2)=(squeeze(map_wavshape(:,:,uu,vv,2))-cy).*mask;
                 end
@@ -177,16 +177,18 @@ for i=1:maxIter
 
 
                 tmp2 = gpuArray.zeros(img_r,img_c,psf_z,'single');
-                tmp2((img_r+1)/2-(psf_r-1)/2:(img_r+1)/2+(psf_r-1)/2,(img_c+1)/2-(psf_r-1)/2:(img_c+1)/2+(psf_r-1)/2,:)  = flip(gpuArray(squeeze(psf(:,:,u,v,:))),3);
-                tmp2 = fft3_new(tmp2);
-                sumupXG = single(sum(fft3_new(Xguess).*tmp2,3));
+                tmp2((img_r+1)/2-(psf_r-1)/2:(img_r+1)/2+(psf_r-1)/2,(img_c+1)/2-(psf_r-1)/2:(img_c+1)/2+(psf_r-1)/2,:)  = gpuArray(squeeze(psf(:,:,u,v,:)));
+                tmp3 = flip(tmp2,3);
+                tmp3 = fft3_new(tmp3);
+                
+                sumupXG = single(sum(fft3_new(Xguess).*tmp3,3));
                 
                 sumupXG=sumupXG./psf_z;
-                
+                tmp2 = fft3_new(rot90(tmp2,2));
                 HXguessBack = (ifft3_new(repmat(sumupXG,[1,1,psf_z]).*tmp2));
                 errorBack = ifft3_new(fftshift(fftn(ifftshift(blur_image_uv))).*tmp2);
                 errorBack = real(errorBack./HXguessBack);
-                clear HXguessBack tmp2;
+                clear HXguessBack tmp2 tmp3;
                 Xguess = Xguess.*errorBack*weight1(u,v)*iter_weight+(1-weight1(u,v)*iter_weight).*Xguess;
                 clear errorBack;
 
