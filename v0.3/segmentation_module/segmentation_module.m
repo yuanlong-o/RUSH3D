@@ -66,7 +66,7 @@ valid_seg_global= valid_seg_array;
 save(sprintf('%s\\valid_seg_global.mat', outdir), 'valid_seg_global')
 %% boundary filter
 % components in the boundary will be discarded
-margin_dis =100;
+margin_dis =10;
 exclude_ind = [];
 for i = 1 : size(valid_seg_global, 1)
     curr_center = mean(valid_seg_global{i, 2}, 1);
@@ -93,31 +93,32 @@ plot_3D_distribution_mod_depth_irreg(valid_seg_global_bd_filt, [size_h, size_w],
 
 %% blood vessel mask
 % run blood vessel extraction
-symmfilter = struct();
-symmfilter.sigma     = 8; % variance of DoG
-symmfilter.len       = 100; % rho, querying size
-symmfilter.sigma0    = 1; % blurress kernel
-symmfilter.alpha     = 0.2; % distance decreasing
-asymmfilter = false;
+% symmfilter = struct();
+% symmfilter.sigma     = 8; % variance of DoG
+% symmfilter.len       = 100; % rho, querying size
+% symmfilter.sigma0    = 1; % blurress kernel
+% symmfilter.alpha     = 0.2; % distance decreasing
+% asymmfilter = false;
+% 
+% % down sample the image
+% % image_d = imresize(image, 0.2);
+% 
+% % Apple BCOSFIRE filter
+% % img = movie(:, :, 1);
+% img = max(img(:)) - img;
+% response_stack = BCOSFIRE_lfm(img, symmfilter, asymmfilter); % only 2d here
+% figure, imshow(response_stack)
+% 
+% % calculate the mask
+% se = strel('disk',5);
+% response_stack_segm= imdilate(response_stack, se);
+% response_stack_segm = response_stack_segm > 5e-2;
+% %
+% % response_stack_segm = imgaussfilt(response_stack_segm, 10);
+% figure, imshow(response_stack_segm)
+% saveastiff(im2uint16(response_stack_segm), sprintf('%s\\blood_vessel_mask.tiff', outdir));
 
-% down sample the image
-% image_d = imresize(image, 0.2);
-
-% Apple BCOSFIRE filter
-% img = movie(:, :, 1);
-img = max(img(:)) - img;
-response_stack = BCOSFIRE_lfm(img, symmfilter, asymmfilter); % only 2d here
-figure, imshow(response_stack)
-
-% calculate the mask
-se = strel('disk',5);
-response_stack_segm= imdilate(response_stack, se);
-response_stack_segm = response_stack_segm > 5e-2;
-%
-% response_stack_segm = imgaussfilt(response_stack_segm, 10);
-figure, imshow(response_stack_segm)
-saveastiff(im2uint16(response_stack_segm), sprintf('%s\\blood_vessel_mask.tiff', outdir));
-
+response_stack_segm  = zeros(size(img));
 %% grab the center and spatial footprint in the central view stack
 
 exclude_ind = 0;

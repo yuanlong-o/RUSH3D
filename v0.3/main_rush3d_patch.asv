@@ -460,8 +460,8 @@ oasis_lambda = 0.02;
 oasis_g = 0.9;
 lambda_l0 = 0.01;
 frames_step = 1;
-%%
-for global_patch_id = 2 : length(patch_info_array) % for lateral patches
+
+for global_patch_id = 1 : length(patch_info_array) % for lateral patches
     fprintf('patch %d\n', global_patch_id);
     curr_outdir = sprintf('%s\\patch_%d', outdir, global_patch_id);
     mkdir(curr_outdir)
@@ -607,9 +607,7 @@ for global_patch_id = 2 : length(patch_info_array) % for lateral patches
 %         save(fullfile(curr_outdir, ['after_classifier_filter.mat']),...
 %             'T_filtered', 'S_filtered', 'T_deconv_filtered', ...
 %             'center_array_filtered', 'seg_filtered', '-v7.3');
-
-        seg_filtered = valid_seg;
-        center_array_filtered  = center_array;
+        center_array_filtered  = center_array(positive_ind, :);
         T_filtered = deconvol_neuron_trace_mat;
     %% apply patches shifts
         reg_center = center_array_filtered;
@@ -629,7 +627,7 @@ for global_patch_id = 2 : length(patch_info_array) % for lateral patches
         
         
         save(fullfile(curr_outdir, ['registered.mat']),...
-            'reg_center', 'reg_seg', 'T_filtered', '-v7.3');
+            'reg_center', 'reg_seg', ' T_filtered', '-v7.3');
     else
         continue
     end
