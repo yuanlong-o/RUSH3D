@@ -320,10 +320,13 @@ while searching_flag && K>0 && ind_false_time < false_threshold
         ai_2d = reshape(ai, sz(1), sz(2));
         % ellipse fiting
         BW = ai_2d > (min_threshold * (max(ai_2d(:)) - min(ai_2d(:)))+ min(ai_2d(:)));
-        B = bwboundaries(BW);
-        B_1 = B{1}(:, 1);
-        B_2 = B{1}(:, 2);
-        
+        try
+            B = bwboundaries(BW);
+            B_1 = B{1}(:, 1);
+            B_2 = B{1}(:, 2);
+        catch
+            ind_success = false;
+        end
         
 
 %         B = BW - imerode(BW, true(3));

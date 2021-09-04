@@ -433,7 +433,7 @@ seed_param.estimate_patch_size = 500;
 seed_param.pixel_size = recon_param.pixel_size; % lateral pixel size
 seed_param.down_factor = preprocess_param.Nnum / preprocess_param.Nshift;
 
-seed_param.neuron_number = 100;
+seed_param.neuron_number = 150;
 seed_param.neuron_lateral_size =8;
 seed_param.local_constrast_th = 1.3;
 seed_param.optical_psf_ratio = seed_param.per_slice_depth / seed_param.pixel_size;
@@ -461,7 +461,7 @@ oasis_g = 0.9;
 lambda_l0 = 0.01;
 frames_step = 1;
 %%
-for global_patch_id = 2 : length(patch_info_array) % for lateral patches
+for global_patch_id = 1 : length(patch_info_array) % for lateral patches
     fprintf('patch %d\n', global_patch_id);
     curr_outdir = sprintf('%s\\patch_%d', outdir, global_patch_id);
     mkdir(curr_outdir)
