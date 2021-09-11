@@ -166,7 +166,7 @@ tic;
 first_WDF = realign_module(preprocess_param, input_rawdata_name, realigndata_name_perfix);
 t_realign = toc;
 fprintf('Realign process done and it takes %.2f secs\n',t_realign);
-
+valid_frame_num = preprocess_param.valid_frame_num;
 
 %% multiscale de background
 % load large range low resolution psf
@@ -293,12 +293,18 @@ for ch_id = 1 : debgrecon_param.mchannel
         tic;
         % apply shift
         view_ind = sub2ind([preprocess_param.Nnum,preprocess_param.Nnum],u_index(view_id),v_index(view_id));
-        view_video = double(loadtiff(sprintf('%s\\mul_video_view%d_ch%d_g%d.tiff',vid_debg_mul_video_savepath, ...
-                                view_ind,ch_id, g_id)));
+        view_video = [];
+        for g_id = 1: debgrecon_param.savegroup
+            view_video = cat(3,view_video,double(loadtiff(sprintf('%s\\mul_video_view%d_ch%d_g%d.tiff',vid_debg_mul_video_savepath, ...
+                view_ind,ch_id, g_id))));
+        end
         view_video = apply_shifts(view_video, shifts, option_r, bound/2, bound/2);
         
         % save
-        imwriteTFSK(im2uint16(view_video/65535),sprintf('%s\\reg_view_%d.tiff', reg_savepath, view_ind));
+        for g_id = 1: debgrecon_param.savegroup-1
+            saveastiff(im2uint16(view_video(:,:,(g_id-1)*maxframe+1:g_id*maxframe)/65535),sprintf('%s\\reg_view_%d_g_%d.tiff', reg_savepath, view_ind,g_id));
+        end
+        saveastiff(im2uint16(view_video(:,:,(debgrecon_param.savegroup-1)*maxframe+1:end)/65535),sprintf('%s\\reg_view_%d_g_%d.tiff', reg_savepath, view_ind,g_id));
         
         % calculate std
         maxIter = regstd_param.maxIter;
@@ -514,7 +520,7 @@ for global_patch_id = 1 : length(patch_info_array) % for lateral patches
 
         %% prepare iteration video
         % ~ 2h  
-        [processed_video] = iteration_preparation_patch(reg_savepath, preprocess_param.num_rawdata , specify_wigner, ...
+        [processed_video] = iteration_preparation_patch(savegroup, reg_savepath, preprocess_param.num_rawdata , specify_wigner, ...
                                                         curr_patch_info, recon_param, S_init);
 
         % background component initialization

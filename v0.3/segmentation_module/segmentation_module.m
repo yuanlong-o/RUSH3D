@@ -20,6 +20,9 @@ mkdir(outdir)
 % associate the reconstructions with central view.
 estimate_patch_size = seed_param.estimate_patch_size;
 down_factor = seed_param.down_factor; % control ratio between wigner and global
+if down_factor * size(img, 1) == size(curr_volume, 1) && down_factor * size(img, 2) == size(curr_volume, 2)
+    curr_volume = imresize(curr_volume,[down_factor * size(img, 1),down_factor * size(img, 2)]);
+end
 assert(down_factor * size(img, 1) == size(curr_volume, 1) && down_factor * size(img, 2) == size(curr_volume, 2))
 pixel_size=seed_param.pixel_size;
 per_slice_depth = seed_param.per_slice_depth;

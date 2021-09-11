@@ -1,4 +1,4 @@
-function processed_video = iteration_preparation_patch( reg_path, valid_frame, ...
+function processed_video = iteration_preparation_patch( savegroup, reg_path, valid_frame, ...
                                                         specify_wigner, curr_patch_info, ...
                                                         psf_param, S_init)
 %  load wigners, and subtract marginal view information from central view
@@ -13,7 +13,10 @@ buf_S = full(buf_S);
 [size_h, size_w] = size(buf_S);
 
 % query the overall size
-buf_wigner_video = imresize(loadtiff(sprintf('%s\\reg_view_%d.tiff', reg_path, 1)),4);
+
+
+buf_wigner_video = loadtiff(sprintf('%s\\reg_view_%d_g_%d.tiff', reg_path, 1,1));
+
 [size_h_global, size_w_global, ~] = size(buf_wigner_video);
 
 % determine cut position for h
@@ -40,7 +43,10 @@ processed_video = zeros(size_h, size_w, valid_frame, num_wigner, 'single');
 
 %% main load module
 for j = 1 : num_wigner % number of specified wigner
-    curr_video = loadtiff(sprintf('%s\\reg_view_%d.tiff', reg_path, specify_wigner(j)));
+    curr_video = [];
+    for g_id = 1 : savegroup
+        curr_video = cat(3,curr_video,loadtiff(sprintf('%s\\reg_view_%d_g_%d.tiff', reg_path, specify_wigner(j),g_id)));
+    end
     curr_video = single(curr_video) / 65535;
     processed_video(:, :, :, j) = curr_video(cut_start_h : cut_end_h,...
                                              cut_start_w : cut_end_w, :);
