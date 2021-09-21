@@ -304,7 +304,7 @@ for ch_id = 1 : debgrecon_param.mchannel
         for g_id = 1: debgrecon_param.savegroup-1
             saveastiff(im2uint16(view_video(:,:,(g_id-1)*maxframe+1:g_id*maxframe)/65535),sprintf('%s\\reg_view_%d_g_%d.tiff', reg_savepath, view_ind,g_id));
         end
-        saveastiff(im2uint16(view_video(:,:,(debgrecon_param.savegroup-1)*maxframe+1:end)/65535),sprintf('%s\\reg_view_%d_g_%d.tiff', reg_savepath, view_ind,g_id));
+        saveastiff(im2uint16(view_video(:,:,(debgrecon_param.savegroup-1)*maxframe+1:end)/65535),sprintf('%s\\reg_view_%d_g_%d.tiff', reg_savepath, view_ind,debgrecon_param.savegroup));
         
         % calculate std
         maxIter = regstd_param.maxIter;
