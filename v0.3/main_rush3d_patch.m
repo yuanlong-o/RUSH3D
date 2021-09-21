@@ -42,7 +42,7 @@ color_scheme_npg = [...
 
 % output dir
 % outdir = 'D:\RUSH3Dproject\RUSH3Dresult\0816\5x_br_tb_0.00_bg_0.00_lfm\test_patch'; % MW path
-outdir = 'D:\RUSH3Dproject\RUSH3Dresult\0622\rasai148d_1_z287\test1'; % YZ
+outdir = 'D:\RUSH3Dproject\RUSH3Dresult\0622\rasai148d_1_z287\test0'; % YZ
 mkdir(outdir)
 
 % rawdata dir and file name
@@ -61,7 +61,7 @@ recon_psfpath = 'D:\RUSH3Dproject\RUSH3Dpsf\5.761x_lambda_525_axial_-300um_to_60
 
 
 preprocess_param.video_option = 1; % realign and reconstruction one frame by one frame when 1
-preprocess_param.num_rawdata = 2000;
+preprocess_param.num_rawdata = 650;
 
 
 %% Parameter setting
@@ -340,7 +340,7 @@ recon_param.psf_layer_position = 1:1: recon_param.psf_end;
 [psf, recon_param] = psf_load_module(recon_param,recon_psfpath);
 recon_param.upsampling = recon_param.Nnum / recon_param.Nshift / recon_param.downsampling_rate;
 
-recon_param.patch_side = recon_param.side *  recon_param.upsampling;
+recon_param.patch_side = ceil(recon_param.side *  recon_param.upsampling);
 recon_param.patchnum = recon_param.patchx * recon_param.patchy;
 
 % only reconstruct one frame
@@ -520,7 +520,7 @@ for global_patch_id = 1 : length(patch_info_array) % for lateral patches
 
         %% prepare iteration video
         % ~ 2h  
-        [processed_video] = iteration_preparation_patch(savegroup, reg_savepath, preprocess_param.num_rawdata , specify_wigner, ...
+        [processed_video] = iteration_preparation_patch(savegroup, reg_savepath, preprocess_param.valid_frame_num , specify_wigner, ...
                                                         curr_patch_info, recon_param, S_init);
 
         % background component initialization
