@@ -1,4 +1,4 @@
-function [first_WDF] = realign_module(preprocess_param, rawdata_name, realigndata_name_perfix)
+function [] = realign_module(preprocess_param, rawdata_name, realigndata_name_perfix)
 %% Realign Module Realign sLF data
 % This program is used to realign scanning light field data (raw or std),
 % this is programmed by c++, and command will losd the stack frame by frame
@@ -65,15 +65,7 @@ command = sprintf('ReAlign %d %s %s %d %d %d %d %d %d %s %d %d %d %d %s %s %d %f
 system(command);
 
 % load first group of realigned wdf
-temp_wdf = double(imread(strcat(realigndata_name_perfix,'_No0.tif'),1));
-first_WDF = zeros(size(temp_wdf,1),size(temp_wdf,2),Nnum,Nnum);
-for u = 1 : Nnum
-    for v = 1 : Nnum
-        temp = double(imread(strcat(realigndata_name_perfix,'_No0.tif'),(u-1)*Nnum+v));
-        first_WDF(:,:,u,v) = temp;
-        %disp(strcat('u = ',num2str(u),', v = ',num2str(v),' has been load...'));
-    end
-end
+
 
 end
 

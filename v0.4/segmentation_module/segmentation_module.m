@@ -16,14 +16,9 @@ function [valid_seg_global_filt] = segmentation_module(curr_volume, img, seed_pa
 outdir = seed_param.outdir;
 mkdir(outdir)
 
-
+ds_ratio = seed_param.NN_ds * seed_param.wdf_ds / seed_param.vol_ds;
 % associate the reconstructions with central view.
 estimate_patch_size = seed_param.estimate_patch_size;
-down_factor = seed_param.down_factor; % control ratio between wigner and global
-if down_factor * size(img, 1) == size(curr_volume, 1) && down_factor * size(img, 2) == size(curr_volume, 2)
-    curr_volume = imresize(curr_volume,[down_factor * size(img, 1),down_factor * size(img, 2)]);
-end
-assert(down_factor * size(img, 1) == size(curr_volume, 1) && down_factor * size(img, 2) == size(curr_volume, 2))
 pixel_size=seed_param.pixel_size;
 per_slice_depth = seed_param.per_slice_depth;
 % load current image    
@@ -40,7 +35,7 @@ for j = 1 : length(patch_info_array) % for lateral patches
     j
     curr_param = seed_param;
     curr_param.outdir = sprintf('%s\\seg_%d', curr_param.outdir, j);
-    mkdir(curr_param.outdir )
+    mkdir(curr_param.outdir)
     curr_patch_info = patch_info_array{j};
 
     % grab current patch
@@ -48,7 +43,7 @@ for j = 1 : length(patch_info_array) % for lateral patches
                               curr_patch_info.location(1, 2) : curr_patch_info.location(2, 2), ...
                               :);
     % segmentation
-    [valid_seg, discard_seg] = neuron_segmentation_module(patch_volume , curr_param);
+    [valid_seg, discard_seg] = neuron_segmentation_module(patch_volume, curr_param);
     %%
     % apply the bias information
     if find(~cellfun(@isempty,valid_seg))
@@ -64,7 +59,7 @@ for j = 1 : length(patch_info_array) % for lateral patches
         continue
     end
 end
-valid_seg_global= valid_seg_array;  
+valid_seg_global = valid_seg_array;  
 
 save(sprintf('%s\\valid_seg_global.mat', outdir), 'valid_seg_global')
 %% boundary filter
@@ -126,7 +121,7 @@ response_stack_segm  = zeros(size(img));
 
 exclude_ind = 0;
 for i = 1 : size(valid_seg_global_bd_filt, 1)
-    i
+   i
    % load current segmentation
    curr_seg = valid_seg_global_bd_filt{i, 1};
    curr_center = valid_seg_global_bd_filt{i, 2};
@@ -136,7 +131,7 @@ for i = 1 : size(valid_seg_global_bd_filt, 1)
    
    % do the mapping
    curr_center_cut = mean(curr_center(:, 1 : 2), 1); % only xy
-   curr_center_cut = curr_center_cut / down_factor;
+   curr_center_cut = curr_center_cut / ds_ratio;
    
     % concatenate
 
@@ -146,8 +141,8 @@ for i = 1 : size(valid_seg_global_bd_filt, 1)
     end
     
     % vessel segment check
-	if response_stack_segm(max(min(round(curr_center_cut(1)), size_h / down_factor), 1), ...
-                           max(min(round(curr_center_cut(2)), size_w / down_factor), 1)) > 0 % in the mask
+    if response_stack_segm(max(min(floor(curr_center_cut(1)), size(img,1)), 1), ...
+            max(min(round(curr_center_cut(2)), size(img,2)), 1)) > 0 % in the mask
         exclude_ind(i) = 1; % set 0 to cancel other options
     end
     

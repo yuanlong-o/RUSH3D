@@ -38,7 +38,7 @@ margin = recon_param.margin; % margin overlap
 view_num = length(view_array);
 weight = squeeze(sum(sum(sum(WDF,1),2),4));
 weight=squeeze(weight./sum(weight(:)));
-iter_weight = 0.8*1/max(weight(:)); % iteration weight
+iter_weight = 0.4*1/max(weight(:)); % iteration weight
 
 [~,~,seq_ind] = Spiral_circle(Nnum,view_range);
 WDF = single(WDF);

@@ -1,0 +1,16 @@
+v0.3 9.9 update nobug 1400f ->55h
+realign 25min
+debg 9h
+reg+std 25h
+recon 5min
+signal extraction 20h
+
+v0.4 9.21update recon 之前nobug 理论26h
+1. 减少角度 225->81
+2. reg fft->linear
+3.debg降采样 lateral 14-> 30 axial 20um -> 80um
+
+realign 25min
+debg  5s ->2h
+reg+std ->3.6h
+recon ->5min

@@ -44,8 +44,9 @@ processed_video = zeros(size_h, size_w, valid_frame, num_wigner, 'single');
 %% main load module
 for j = 1 : num_wigner % number of specified wigner
     curr_video = [];
+    view_ind = sub2ind([psf_param.Nnum,psf_param.Nnum],specify_wigner(j,2),specify_wigner(j,1));
     for g_id = 1 : savegroup
-        curr_video = cat(3,curr_video,loadtiff(sprintf('%s\\reg_view_%d_g_%d.tiff', reg_path, specify_wigner(j),g_id)));
+        curr_video = cat(3,curr_video,loadtiff(sprintf('%s\\reg_view_%d_g_%d.tiff', reg_path, view_ind,g_id)));
     end
     curr_video = single(curr_video) / 65535;
     processed_video(:, :, :, j) = curr_video(cut_start_h : cut_end_h,...

@@ -2,7 +2,7 @@ function [bg_spatial_init, bg_temporal_init] = initialize_bg(processed_video, bg
 valid_wigner = size(processed_video, 4);
 for j = 1 : valid_wigner
     sensor_movie = processed_video(:, :, :, j);
-    [size_h, size_w, T] = size(sensor_movie);
+    [~, ~, T] = size(sensor_movie);
     sensor_movie = reshape(sensor_movie, [],T);
     [spatial_buf, temporal_buf] = rank_1_factorization(sensor_movie, bg_iter);
     

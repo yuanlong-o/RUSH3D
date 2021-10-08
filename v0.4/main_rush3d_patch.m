@@ -42,16 +42,16 @@ color_scheme_npg = [...
 
 % output dir
 % outdir = 'D:\RUSH3Dproject\RUSH3Dresult\0816\5x_br_tb_0.00_bg_0.00_lfm\test_patch'; % MW path
-outdir = 'D:\RUSH3Dproject\RUSH3Dresult\0622\rasai148d_1_z287\test3'; % YZ
+outdir = 'D:\RUSH3Dproject\RUSH3Dresult\20210928\rasgrf-ai148d_5xTMP_whisker3\test'; % YZ
 mkdir(outdir)
 
 % rawdata dir and file name
 % rawdata_path = 'D:\RUSH3Dproject\RUSH3Drawdata\0816\5x_br_tb_0.00_bg_0.00_lfm_uni_N_975_stack'; % raw data path (before rotate, resize and rotate);
-rawdata_path = 'D:\RUSH3Dproject\RUSH3Drawdata\0622\rasai148d_1_z287'; % raw data path (before rotate, resize and rotate);
+rawdata_path = 'D:\RUSH3Dproject\RUSH3Drawdata\20210928\rasgrf-ai148d_5xTMP_whisker3'; % raw data path (before rotate, resize and rotate);
 
 
 
-first_file_name = 'rasai148d_1_z287_3x3_45.0ms_Full_Hardware_LaserCount1_210622144634'; % in one video or one capture, the name of first stack
+first_file_name = 'rasgrf-ai148d_5xTMP_whisker3_3x3_50.0ms_Full_Hardware_LaserCount1_210928213137'; % in one video or one capture, the name of first stack
 input_rawdata_perfix = [rawdata_path, '\\', first_file_name]; % the first file in one capture
 
 % debg psfpath
@@ -61,7 +61,7 @@ recon_psfpath = 'D:\RUSH3Dproject\RUSH3Dpsf\5.761x_lambda_525_axial_-300um_to_60
 
 
 preprocess_param.video_option = 1; % realign and reconstruction one frame by one frame when 1
-preprocess_param.num_rawdata = 620;
+preprocess_param.num_rawdata = 3000;
 
 
 %% Parameter setting
@@ -69,14 +69,14 @@ estimate_patch_size = 500;
 %% Realign parameter
 preprocess_param.Nnum = 15; % 15 x 15 pixels behind each microlen. This parameter do not have to change.  
 preprocess_param.Nshift = 3; % scanning for Nshift x Nshift times (all choices: 3: 3 x 3; 5: 5 x 5; 13: 13 x 13)
-preprocess_param.start_frame = 600; % the number of start frame (the first number is 0, from 0 to N-1)
+preprocess_param.start_frame = 0; % the number of start frame (the first number is 0, from 0 to N-1)
 preprocess_param.frame_interval = 1; % interval of frame (1 by default: process frame by frame, no jump frame)
 % Here we choose the center of rawdata and determine ROI, we strongly
 % recommend choose the center manually.
 preprocess_param.auto_center_mode = 0; % find the center coordinate of x and y automatically when it is 1 and it will disable center_X and center_Y, otherwise 0
 preprocess_param.conf_name = './utility/realign/3x3.conf.sk.png'; % configuration file for scanning which is corresponding to Nshift
-preprocess_param.center_X = 4002; % the center coordinate x of Light field data (Note that the coordinate is from 0 to N-1 in c++)
-preprocess_param.center_Y = 3000; % the center coordinate y of Light field data (Note that the coordinate is from 0 to N-1 in c++)
+preprocess_param.center_X = 3999; % the center coordinate x of Light field data (Note that the coordinate is from 0 to N-1 in c++)
+preprocess_param.center_Y = 2997; % the center coordinate y of Light field data (Note that the coordinate is from 0 to N-1 in c++)
 preprocess_param.Nx = 260; % take half number of microlens in x direction (total number: Nx * 2 + 1)
 preprocess_param.Ny = 190; % take half number of microlens in y direction (total number: Nx * 2 + 1)
 
@@ -95,7 +95,7 @@ debgrecon_param.mul_ds_psf = 30; % down sample rate of psf is 12
 debgrecon_param.PSF_broader = 1; % cut psf 12 pixel for each side (four sides)
 debgrecon_param.psf_end = 101; % psf axial number
 debgrecon_param.zstep = 80; % dz (um)
-debgrecon_param.zvrange = [-40,360]; % valid
+debgrecon_param.zvrange = [-200,200]; % valid
 debgrecon_param.zwrange = [-1000,1000]; % whole
 debgrecon_param.view_range = 5;
 debgrecon_param.writemode = 0; % 0: no output, 2: output last iteration, 1: ouput all result
@@ -167,11 +167,12 @@ preprocess_param.centerview = strcat(realigndata_name_perfix,'_cv.tiff');
 
 % start realign
 tic;
-first_WDF = realign_module(preprocess_param, input_rawdata_name, realigndata_name_perfix);
+realign_module(preprocess_param, input_rawdata_name, realigndata_name_perfix);
 t_realign = toc;
 fprintf('Realign process done and it takes %.2f secs\n',t_realign);
 valid_frame_num = preprocess_param.valid_frame_num;
-
+%%
+first_WDF = loadtiff(sprintf('%s_No0.tif',realigndata_name_perfix));
 %% multiscale de background
 % load large range low resolution psf
 disp('---------------------------load low resolution psf for de background---------------------------');
@@ -211,8 +212,8 @@ if ~exist(vid_debg_mul_video_savepath,'file')
 end
 
 % calculate byte
-single_size = size(first_WDF,1)*size(first_WDF,2)*16/8/(1024*1024);
-debgrecon_param.maxframe = 4*1024/single_size;
+single_size = ceil(size(first_WDF,1)*size(first_WDF,2)*16/8/(1024*1024));
+debgrecon_param.maxframe = floor(4*1000/single_size);
 maxframe = debgrecon_param.maxframe; 
 
 global bg_ratio
@@ -223,8 +224,9 @@ t_debg_start = clock;
 [~, ~, seq_ind] = Spiral_circle(preprocess_param.Nnum,preprocess_param.view_range);
 seq_ind = seq_ind(end:-1:1);
 
+count = 0;
 for channel = 1: debgrecon_param.mchannel
-    for frame_i = channel : debgrecon_param.mchannel: preprocess_param.valid_frame_num
+    for frame_i = 1 : debgrecon_param.mchannel: preprocess_param.valid_frame_num
         view_video = zeros(size(first_WDF,1),size(first_WDF,2),length(view_array));
         for v = 1: length(view_array)
             view_video(:,:,v) = imread(sprintf('%s_No%d.tif', realigndata_name_perfix, frame_i - 1),...
@@ -233,27 +235,27 @@ for channel = 1: debgrecon_param.mchannel
         % multiscale sub ground noise
         view_video = sub_mul_bg_module(depsf,debgrecon_param,view_video,...
             vid_recon_mul_savepath,vid_debg_mul_savepath,first_file_name,frame_i-1,channel-1);
-
         
         % save
-        count = 0;
-        for v_ind = 1:length(view_array)
-            v  = seq_ind(v_ind);
-            if mod((frame_i-channel),maxframe) == 0
-                count = count + 1;
-
-                savegroup = floor((count-1)/(debgrecon_param.mchannel*length(view_array)))+1;
+        if mod((frame_i-channel),maxframe) == 0
+            count = count + 1;
+            savegroup = floor((count-1)/debgrecon_param.mchannel)+1;
+            for v_ind = 1:length(view_array)
+                v = seq_ind(v_ind);
                 imwrite(im2uint16(view_video(:,:,v)/65535),strcat(vid_debg_mul_video_savepath,'\\',...
                     'mul_video_view',num2str(v),'_ch',num2str(channel),'_g',num2str(savegroup),'.tiff'));
-            else
+            end
+        else
+            for v_ind = 1:length(view_array)
+                v = seq_ind(v_ind);
                 imwrite(im2uint16(view_video(:,:,v)/65535),strcat(vid_debg_mul_video_savepath,'\\',...
                     'mul_video_view',num2str(v),'_ch',num2str(channel),'_g',num2str(savegroup),'.tiff'),'WriteMode','append');
             end
         end
-        
         tt = toc;
         fprintf('%d frame is done, take %.2fs\n',frame_i,tt);
     end
+    
 end
 t_debg = etime(clock,t_debg_start);
 fprintf('Debg process done and it takes %.2f secs\n',t_debg);
@@ -263,7 +265,7 @@ clear psf;
 
 %% Registration and STD
 disp('---------------------------Registration---------------------------');
-
+ 
 reg_savepath = sprintf('%s\\reg_path', outdir);
 if ~exist(reg_savepath,'file')
     mkdir(reg_savepath);
@@ -316,7 +318,7 @@ for ch_id = 1 : debgrecon_param.mchannel
         end
         std_WDF(:, :, v) = reshape(curr_std_image, [size(view_video , 1), size(view_video , 2)]);
         t_onereg = toc;
-        fprintf('%d in %d view has been registered and std and it takes %.2f secs\n', v, preprocess_param.Nnum^2, t_onereg);
+        fprintf('%d in %d view has been registered and std and it takes %.2f secs\n', v, length(view_array), t_onereg);
     end
 end
 % save std
@@ -386,7 +388,7 @@ for patch_idx = 1: recon_param.patchx
         std_WDF_up = imresize(std_WDF_sub, ...
             [floor(size(std_WDF_sub,1)*recon_param.upsampling/2)*2+1,...
             floor(size(std_WDF_sub,2)*recon_param.upsampling/2)*2+1],'cubic');
-        std_volume_patch = ones(size(std_WDF_up,1),size(std_WDF_up,2),size(psf,5));
+        std_volume_patch = ones(size(std_WDF_up,1),size(std_WDF_up,2),size(psf,4));
         std_volume_patch = std_volume_patch./sum(std_volume_patch(:)).*sum(std_volume_patch(:))./(size(std_volume_patch,3)*size(std_volume_patch,4));      
         std_volume_patch = reconstruction_module(recon_param, std_volume_patch, psf, std_WDF_up, std_recon_name_perfix, view_array, frame);
         
@@ -401,318 +403,323 @@ std_volume = imresize(std_volume,[size(first_WDF_cut_side,1)*recon_param.upsampl
 % save std reconstruction result
 std_recon_savepath = strcat(outdir, '\\','std_recon_seperate');
 imwriteTFSK(uint16(std_volume/max(std_volume(:))*65535),strcat(std_recon_savepath,'\\','whole_patch.tiff'));
-std_volume = double(std_volume);
-std_volume = std_volume  / max(std_volume(:));
-%% start processing patch
-% --------------------patch preparation--------------------
-[patch_info_array]= determine_patch_size_LFM(size(std_volume, 1), size(std_volume, 2),...
-                estimate_patch_size, preprocess_param.Nnum);
-ds = preprocess_param.Nnum / preprocess_param.Nshift;
-% --------------------std parameters--------------------
-diff_psf_layer_position = diff(recon_param.psf_layer_position);
-buf = find(diff_psf_layer_position == 1);
-start_ind = buf(1);
-end_ind = buf(end);
-if recon_param.psf_layer_position(end) == recon_param.psf_layer_position(end - 1) + 1
-    end_ind = end_ind + 1;
-end
 
-std_volume_cut = std_volume(:, :, start_ind : end_ind);
-std_volume_cut = std_volume_cut / max(std_volume_cut(:));
-volum_size_cut = [size(std_volume_cut, 1), size(std_volume_cut, 2), size(std_volume_cut, 3)];
-
-
-% --------------------segmentation parameters--------------------
-seed_param.outdir = outdir;
-seed_param.per_slice_depth = recon_param.per_slice_depth;
-seed_param.estimate_patch_size = 500;
-seed_param.pixel_size = recon_param.pixel_size; % lateral pixel size
-seed_param.down_factor = preprocess_param.Nnum / preprocess_param.Nshift;
-
-seed_param.neuron_number = 150;
-seed_param.neuron_lateral_size =8;
-seed_param.local_constrast_th = 1.3;
-seed_param.optical_psf_ratio = seed_param.per_slice_depth / seed_param.pixel_size;
-seed_param.overlap_ratio = 0.5;
-seed_param.boundary_thickness = 2; % for plot
-seed_param.discard_component_save = false;
-seed_param.volume_threshold = [5 * seed_param.neuron_lateral_size.^2, 500* seed_param.neuron_lateral_size.^2];
-
-
-% --------------------seed generation--------------------
-shell_radius = ceil(2* seed_param.neuron_lateral_size);
-
-% --------------------iteration related--------------------
-bg_iter=10;
-max_demixing_round = 5;
-maxIter_NMF = 10;
-
-global_center = [];
-global_trace = [];
-global_seg = [];
-
-% --------------------background rejection--------------------
-oasis_lambda = 0.02;
-oasis_g = 0.9;
-lambda_l0 = 0.01;
-frames_step = 1;
-%%
-for global_patch_id = 1 : length(patch_info_array) % for lateral patches
-    fprintf('patch %d\n', global_patch_id);
-    curr_outdir = sprintf('%s\\patch_%d', outdir, global_patch_id);
-    mkdir(curr_outdir)
-    %% volume preparation
-    first_WDF_cut_side = first_WDF(recon_param.side+1:end-recon_param.side,recon_param.side+1:end-recon_param.side,:,:);
-    
-    curr_patch_info = patch_info_array{global_patch_id};
-    patch_volume = std_volume_cut(curr_patch_info.location(1, 1) : curr_patch_info.location(2, 1), ...
-                                  curr_patch_info.location(1, 2) : curr_patch_info.location(2, 2), ...
-                                  :);
-    patch_volum_size_cut = [size(patch_volume, 1), size(patch_volume, 2), size(patch_volume, 3)];
-    
-    patch_WDF = first_WDF_cut_side(ceil(curr_patch_info.location(1, 1) / ds) : ceil(curr_patch_info.location(2, 1) / ds), ...
-                          ceil(curr_patch_info.location(1, 2) / ds) : ceil(curr_patch_info.location(2, 2) / ds), ...
-                          :,:);
-    %% neuron segmentation generation module
-    % ~ 2h
-	center_array = [];
-    disp('--------------------------Neuron segmentation--------------------------')
-    % only keep central ones
-    curr_seed_param = seed_param;
-    curr_seed_param.outdir = curr_outdir;
-
-    valid_seg = segmentation_module(patch_volume, ...
-                                    squeeze(patch_WDF(:, :, ceil(preprocess_param.Nnum / 2), ceil(preprocess_param.Nnum / 2))), ...
-                                    curr_seed_param);
-    % determine if it is an empty patch
-    if find(~cellfun(@isempty,valid_seg))
-        % calcualte component center
-        for i = 1 : size(valid_seg, 1)
-            center_array(i, :) = mean(valid_seg{i, 2}, 1);
-        end
-
-        %% seed module
-        % ~ 4h
-        % generate seed template for iterations
-        disp('--------------------------Iteration preparation--------------------------')
-        % define wigners that is usefull
-        specify_wigner = [ceil(recon_param.Nnum / 2), ceil(recon_param.Nnum / 2)];
-        for i = 1 : 4
-            [u, v] = ind2sub([2, 2], i);
-            buf = [ceil(recon_param.Nnum / 2) + (-1)^u * ceil(recon_param.Nnum / 4),...
-                   ceil(recon_param.Nnum / 2) + (-1)^v * ceil(recon_param.Nnum / 4)];
-            specify_wigner = [specify_wigner ; buf];
-        end
-
-        % generate 2d initialized seed
-        [S_init, S_shell_init,S_mask_init, S_shell_mask_init] = seed_generation_module(psf(:, :, :, :, start_ind : end_ind), ...
-                                                                        recon_param, valid_seg, ...
-                                                                        patch_volum_size_cut, ...
-                                                                        specify_wigner, shell_radius);
-
-        %% prepare iteration video
-        % ~ 2h  
-        [processed_video] = iteration_preparation_patch(savegroup, reg_savepath, preprocess_param.num_rawdata , specify_wigner, ...
-                                                        curr_patch_info, recon_param, S_init);
-
-        % background component initialization
-        [bg_spatial_init, bg_temporal_init] = initialize_bg(processed_video, bg_iter);
-
-        % temporal component initialization
-        [T_init, T_shell_init] = initialize_T(processed_video, S_mask_init,  S_shell_mask_init);
-
-        %% change S shape
-        % ~ 10min
-        S = cell_process_A(S_init, size(processed_video)); clear S_init
-        S_mask_init= cell_process_A(S_mask_init, size(processed_video)); 
-        S_mask_init = S_mask_init > 0;
-        % 
-        S_bg = cell_process_A(S_shell_init, size(processed_video)) ;  clear S_shell_init
-        S_shell_mask_init = cell_process_A(S_shell_mask_init, size(processed_video));
-        S_shell_mask_init = S_shell_mask_init > 0;
-
-        save(sprintf('%s\\initialization.mat', curr_outdir), 'S', 'S_bg', 'S_mask_init', ...
-                                                        'S_shell_mask_init', 'T_init', 'T_shell_init', '-v7.3')
-        %% main iteration module
-        disp('--------------------------main NMF--------------------------')
-        T = T_init;
-        T_bg = T_shell_init;
-        bg_spatial =  bg_spatial_init;
-        bg_temporal = bg_temporal_init;
-
-        for i = 1 : max_demixing_round
-            fprintf('main demixing %d in %d \n', i, max_demixing_round)
-            [S, S_bg, bg_spatial] = update_spatial_lasso(processed_video, S, S_bg, T, ...
-                    T_bg, bg_spatial, bg_temporal, S_mask_init,S_shell_mask_init, maxIter_NMF);        
-        %
-            [T, T_bg, bg_temporal] = update_temporal_lasso(processed_video, ...
-                    S, S_bg, T, T_bg, bg_spatial, bg_temporal, S_mask_init, S_shell_mask_init, maxIter_NMF);     
-
-        end
-
-        save(sprintf('%s\\final_component.mat', curr_outdir), ...
-                'S', 'S_bg', 'T', 'T_bg', 'bg_spatial', 'bg_temporal', '-v7.3')  
-        %% further core-shell demxing
-        disp('--------------------------background subtraction--------------------------')
-        tic
-
-        neuron_trace_mat = zeros(size(T, 1), size(T, 2));
-        deconvol_neuron_trace_mat = zeros(size(T, 1), size(T, 2));
-        spike_mat = zeros(size(T, 1), size(T, 2));
-        coefs_array = zeros(1, size(T, 1));
-
-        if ~isempty(S_bg)
-            parfor i = 1 : size(S, 2)      
-                center_trace = T(i, :);
-                bg_trace = T_bg(i, :);
-                [coefs, sub_trace, ca_out, sp_out] = neuropil_coefficient_estimation_greedy(center_trace, ...
-                    bg_trace, oasis_lambda, oasis_g, lambda_l0);       
-                neuron_trace_mat(i, :) = sub_trace; % there is no change of 
-                deconvol_neuron_trace_mat(i, :)  = ca_out;
-                spike_mat(i, :) = sp_out;  
-                coefs_array(i) = coefs;
-            end   
-        else
-            parfor i = 1 : size(S, 2)   
-                center_trace = T(i, :);
-                [ca_out, sp_out, ~, ~, ~] = foopsi_oasisAR1(center_trace, oasis_g, oasis_lambda, false,...
-                 true, 1, 100);
-                neuron_trace_mat(i, :) = center_trace; 
-                deconvol_neuron_trace_mat(i, :) = ca_out;
-                spike_mat(i, :) = sp_out;     
-            end
-            coefs_array = [];
-        end
-        toc
-        save(fullfile(curr_outdir, ['after_background_rejection.mat']),...
-            'neuron_trace_mat', 'deconvol_neuron_trace_mat', 'spike_mat', 'coefs_array', '-v7.3');
-        figure, temporal_trace_render(neuron_trace_mat, 'k')
-
-        %% neuron trace filtering
-%         disp('--------------------------temporal filtering--------------------------')
-%         method = 'svm';
-%         trace_keep_mode = 'sensitive';
-%         positive_ind = temporal_activity_filtering(neuron_trace_mat, method, trace_keep_mode);
-%         % update
-%         T_filtered = neuron_trace_mat(positive_ind, :);
-%         S_filtered = spike_mat(positive_ind, :);
-%         T_deconv_filtered = deconvol_neuron_trace_mat(positive_ind, :);
-%         center_array_filtered  = center_array(positive_ind, :);
-%         seg_filtered = valid_seg(positive_ind, :);
+% std_volume = double(std_volume);
+% std_volume = std_volume  / max(std_volume(:));
 % 
-%         save(fullfile(curr_outdir, ['after_classifier_filter.mat']),...
-%             'T_filtered', 'S_filtered', 'T_deconv_filtered', ...
-%             'center_array_filtered', 'seg_filtered', '-v7.3');
-
-        seg_filtered = valid_seg;
-        center_array_filtered  = center_array;
-        T_filtered = deconvol_neuron_trace_mat;
-    %% apply patches shifts
-        reg_center = center_array_filtered;
-        reg_seg = seg_filtered;
-        for k = 1 : size(seg_filtered, 1)
-            % note each seg has multiple small patches
-            reg_seg{k, 2}(:, 1) = seg_filtered{k, 2}(:, 1) + curr_patch_info.location(1, 1);
-            reg_seg{k, 2}(:, 2) = seg_filtered{k, 2}(:, 2) + curr_patch_info.location(1, 2);
-            
-            reg_center(:, 1) = center_array_filtered(:, 1) + curr_patch_info.location(1, 1);
-            reg_center(:, 2) = center_array_filtered(:, 2) + curr_patch_info.location(1, 2);
-        end
-        
-        global_center = [global_center; reg_center];
-        global_seg = [global_seg; reg_seg];
-        global_trace = [global_trace; T_filtered];
-        
-        
-        save(fullfile(curr_outdir, ['registered.mat']),...
-            'reg_center', 'reg_seg', 'T_filtered', '-v7.3');
-    else
-        continue
-    end
-    
-
-end
-% save global results
-save(fullfile(outdir, ['global_output.mat']),...
-        'global_center', 'global_seg', 'global_trace', '-v7.3');
-%% 3D distributions
-figure('Name', 'video', 'position', [100, 100, 400, 300])
-plot_3D_distribution(global_seg, [volum_size_cut(1), volum_size_cut(2)], [1, 2] * seed_param.pixel_size, ...
-                        seed_param.per_slice_depth * recon_param.psf_layer_position, 10) 
-savefig(sprintf('%s\\spatial_distribution_3D.fig', outdir))
-
-%% final plot: 3D neuron distributions in a video
-% with AZ changed
-%{
-avi_filename =[outdir, '\\spatial_video.avi'];
-avi_file = VideoWriter(avi_filename);
-avi_file.FrameRate = 30;
-avi_file.Quality = 100;
-% avi_file.CompressionRatio = 1;
-% avi_file.VideoCompressionMethod = 'H.264';
-avi_file.open();
-
-
-az_angle = 1 : 720;
-el = 19;
-figure('Name', 'video', 'position', [100, 100, 400, 300])
-for i = 1 : 1 : length(az_angle)
-    clf
-	plot_3D_distribution(valid_seg, [volum_size(1), volum_size(2)], [1, 2] * pixel_size, ...
-                        recon_param.psf_layer * per_slice_depth, 10) 
-	view(az_angle(i), el)
-    
-	temp = getframe(gcf);
-%     temp = imresize(temp.cdata, [400, 600]);
-    avi_file.writeVideo(temp);
-   
-end
-avi_file.close();   
-%}
-%% final plot: temporal activity
-tmp_C = zscore(global_trace, 0, 2);
-figure, imagesc(tmp_C)
-pbaspect([1, 2, 1])
-
-% zoom in,
-zoom_in_neuron_id = [1000, 1100];
-zoom_in_time = [500, 800];
-hold on,
-rectangle('Position', [zoom_in_time(1), zoom_in_neuron_id(1), ...
-                zoom_in_time(2) - zoom_in_time(1), ...
-                zoom_in_neuron_id(2) - zoom_in_neuron_id(1)], ...
-                'edgecolor', color_scheme_npg(1, :), ...
-                'linestyle', '--', ...
-                'linewidth', 1)
-savefig(sprintf('%s\\temporal_trace_heat.fig', outdir))
-% zoom in
-figure('position', [1, 1, 300, 600]),
-temporal_trace_render_simple(global_trace(zoom_in_neuron_id(1) : zoom_in_neuron_id(2), ...
-                         zoom_in_time(1) : zoom_in_time(2)))
-colormap('gray')
-caxis([-2, 0])
-axis off
-pbaspect([1, 2, 1])
-savefig(sprintf('%s\\temporal_trace.fig', outdir))
-
-
-%% utility function
-function out_mat_A = cell_process_A(A, movie_size) % would be slow since reach the limit
-    out_mat_A = zeros(movie_size(1) * movie_size(2) * movie_size(4), size(A, 2));
-    for i = 1 : size(A, 1) % number of component
-%         i
-       curr_A =  cell2mat(A(i, :));
-       out_mat_A(:, i) = curr_A(:);
-    end
-    out_mat_A  = sparse(out_mat_A );
-end
-function A_cell = extract_A(A_mat, movie_size)
-    A_cell = cell(size(A_mat, 1), movie_size(4));
-    
-	for i = 1 : size(A_mat, 1) % number of component
-       for j = 1 : movie_size(4) % number of view
-          curr_A = A_mat((j - 1) * movie_size(1) * movie_size(2) + 1 : j * movie_size(1) * movie_size(2), i);
-          A_cell{i, j} = sparse(reshape(curr_A, movie_size(1), movie_size(2)));
-       end
-    end
-end
+% %% start processing patch
+% % --------------------patch preparation--------------------
+% [patch_info_array]= determine_patch_size_LFM(size(std_volume, 1), size(std_volume, 2),...
+%                 estimate_patch_size, preprocess_param.Nnum);
+% ds = preprocess_param.Nnum / preprocess_param.Nshift;
+% % --------------------std parameters--------------------
+% diff_psf_layer_position = diff(recon_param.psf_layer_position);
+% buf = find(diff_psf_layer_position == 1);
+% start_ind = buf(1);
+% end_ind = buf(end);
+% if recon_param.psf_layer_position(end) == recon_param.psf_layer_position(end - 1) + 1
+%     end_ind = end_ind + 1;
+% end
+% 
+% std_volume_cut = std_volume(:, :, start_ind : end_ind);
+% std_volume_cut = std_volume_cut / max(std_volume_cut(:));
+% volum_size_cut = [size(std_volume_cut, 1), size(std_volume_cut, 2), size(std_volume_cut, 3)];
+% 
+% 
+% % --------------------segmentation parameters--------------------
+% seed_param.outdir = outdir;
+% seed_param.per_slice_depth = recon_param.per_slice_depth;
+% seed_param.estimate_patch_size = 500;
+% seed_param.pixel_size = recon_param.pixel_size; % lateral pixel size
+% seed_param.down_factor = preprocess_param.Nnum / preprocess_param.Nshift;
+% 
+% seed_param.neuron_number = 150;
+% seed_param.neuron_lateral_size = 8;
+% seed_param.local_constrast_th = 1.3;
+% seed_param.optical_psf_ratio = seed_param.per_slice_depth / seed_param.pixel_size;
+% seed_param.overlap_ratio = 0.5;
+% seed_param.boundary_thickness = 2; % for plot
+% seed_param.discard_component_save = false;
+% seed_param.volume_threshold = [5 * seed_param.neuron_lateral_size.^2, 500* seed_param.neuron_lateral_size.^2];
+% 
+% 
+% % --------------------seed generation--------------------
+% shell_radius = ceil(2* seed_param.neuron_lateral_size);
+% 
+% % --------------------iteration related--------------------
+% bg_iter=10;
+% max_demixing_round = 5;
+% maxIter_NMF = 10;
+% 
+% global_center = [];
+% global_trace = [];
+% global_seg = [];
+% 
+% % --------------------background rejection--------------------
+% oasis_lambda = 0.02;
+% oasis_g = 0.9;
+% lambda_l0 = 0.01;
+% frames_step = 1;
+% %%
+% for global_patch_id = 1 : length(patch_info_array) % for lateral patches
+%     fprintf('patch %d\n', global_patch_id);
+%     curr_outdir = sprintf('%s\\patch_%d', outdir, global_patch_id);
+%     mkdir(curr_outdir)
+%     %% volume preparation
+%     first_WDF_cut_side = first_WDF(recon_param.side+1:end-recon_param.side,recon_param.side+1:end-recon_param.side,:,:);
+%     
+%     curr_patch_info = patch_info_array{global_patch_id};
+%     patch_volume = std_volume_cut(curr_patch_info.location(1, 1) : curr_patch_info.location(2, 1), ...
+%                                   curr_patch_info.location(1, 2) : curr_patch_info.location(2, 2), ...
+%                                   :);
+%     patch_volum_size_cut = [size(patch_volume, 1), size(patch_volume, 2), size(patch_volume, 3)];
+%     
+%     patch_WDF = first_WDF_cut_side(ceil(curr_patch_info.location(1, 1) / ds) : ceil(curr_patch_info.location(2, 1) / ds), ...
+%                           ceil(curr_patch_info.location(1, 2) / ds) : ceil(curr_patch_info.location(2, 2) / ds), ...
+%                           :,:);
+%     %% neuron segmentation generation module
+%     % ~ 2h
+% 	center_array = [];
+%     disp('--------------------------Neuron segmentation--------------------------')
+%     % only keep central ones
+%     curr_seed_param = seed_param;
+%     curr_seed_param.outdir = curr_outdir;
+% 
+%     valid_seg = segmentation_module(patch_volume, ...
+%                                     squeeze(patch_WDF(:, :, ceil(preprocess_param.Nnum / 2), ceil(preprocess_param.Nnum / 2))), ...
+%                                     curr_seed_param);
+%     % determine if it is an empty patch
+%     %%
+%     if find(~cellfun(@isempty,valid_seg))
+%         % calcualte component center
+%         for i = 1 : size(valid_seg, 1)
+%             center_array(i, :) = mean(valid_seg{i, 2}, 1);
+%         end
+% 
+%         %% seed module
+%         % ~ 4h
+%         % generate seed template for iterations
+%         disp('--------------------------Iteration preparation--------------------------')
+%         % define wigners that is usefull
+%         specify_wigner = zeros(5,1);
+%         specify_wigner(1) = find(cellfun(@(x)all(x(:)==[ceil(recon_param.Nnum / 2), ceil(recon_param.Nnum / 2)]),view_array));
+%         for i = 1 : 4
+%             [u, v] = ind2sub([2, 2], i);
+%             buf = [ceil(recon_param.Nnum / 2) + (-1)^u * ceil(recon_param.Nnum / 4),...
+%                    ceil(recon_param.Nnum / 2) + (-1)^v * ceil(recon_param.Nnum / 4)];
+%             specify_wigner(i) = find(cellfun(@(x)all(x(:)==buf(:)),view_array));
+%         end
+%         
+% 
+%         % generate 2d initialized seed
+%         [S_init, S_shell_init,S_mask_init, S_shell_mask_init] = seed_generation_module(psf(:, :, :, start_ind : end_ind), ...
+%                                                                         recon_param, valid_seg, ...
+%                                                                         patch_volum_size_cut, ...
+%                                                                         specify_wigner, shell_radius);
+% 
+%         %% prepare iteration video
+%         % ~ 2h  
+%         [processed_video] = iteration_preparation_patch(savegroup, reg_savepath, preprocess_param.valid_frame_num , specify_wigner, ...
+%                                                         curr_patch_info, recon_param, S_init);
+% 
+%         % background component initialization
+%         [bg_spatial_init, bg_temporal_init] = initialize_bg(processed_video, bg_iter);
+% 
+%         % temporal component initialization
+%         [T_init, T_shell_init] = initialize_T(processed_video, S_mask_init,  S_shell_mask_init);
+% 
+%         %% change S shape
+%         % ~ 10min
+%         S = cell_process_A(S_init, size(processed_video)); clear S_init
+%         S_mask_init= cell_process_A(S_mask_init, size(processed_video)); 
+%         S_mask_init = S_mask_init > 0;
+%         % 
+%         S_bg = cell_process_A(S_shell_init, size(processed_video)) ;  clear S_shell_init
+%         S_shell_mask_init = cell_process_A(S_shell_mask_init, size(processed_video));
+%         S_shell_mask_init = S_shell_mask_init > 0;
+% 
+%         save(sprintf('%s\\initialization.mat', curr_outdir), 'S', 'S_bg', 'S_mask_init', ...
+%                                                         'S_shell_mask_init', 'T_init', 'T_shell_init', '-v7.3')
+%         %% main iteration module
+%         disp('--------------------------main NMF--------------------------')
+%         T = T_init;
+%         T_bg = T_shell_init;
+%         bg_spatial =  bg_spatial_init;
+%         bg_temporal = bg_temporal_init;
+% 
+%         for i = 1 : max_demixing_round
+%             fprintf('main demixing %d in %d \n', i, max_demixing_round)
+%             [S, S_bg, bg_spatial] = update_spatial_lasso(processed_video, S, S_bg, T, ...
+%                     T_bg, bg_spatial, bg_temporal, S_mask_init,S_shell_mask_init, maxIter_NMF);        
+%         %
+%             [T, T_bg, bg_temporal] = update_temporal_lasso(processed_video, ...
+%                     S, S_bg, T, T_bg, bg_spatial, bg_temporal, S_mask_init, S_shell_mask_init, maxIter_NMF);     
+% 
+%         end
+% 
+%         save(sprintf('%s\\final_component.mat', curr_outdir), ...
+%                 'S', 'S_bg', 'T', 'T_bg', 'bg_spatial', 'bg_temporal', '-v7.3')  
+%         %% further core-shell demxing
+%         disp('--------------------------background subtraction--------------------------')
+%         tic
+% 
+%         neuron_trace_mat = zeros(size(T, 1), size(T, 2));
+%         deconvol_neuron_trace_mat = zeros(size(T, 1), size(T, 2));
+%         spike_mat = zeros(size(T, 1), size(T, 2));
+%         coefs_array = zeros(1, size(T, 1));
+% 
+%         if ~isempty(S_bg)
+%             parfor i = 1 : size(S, 2)      
+%                 center_trace = T(i, :);
+%                 bg_trace = T_bg(i, :);
+%                 [coefs, sub_trace, ca_out, sp_out] = neuropil_coefficient_estimation_greedy(center_trace, ...
+%                     bg_trace, oasis_lambda, oasis_g, lambda_l0);       
+%                 neuron_trace_mat(i, :) = sub_trace; % there is no change of 
+%                 deconvol_neuron_trace_mat(i, :)  = ca_out;
+%                 spike_mat(i, :) = sp_out;  
+%                 coefs_array(i) = coefs;
+%             end   
+%         else
+%             parfor i = 1 : size(S, 2)   
+%                 center_trace = T(i, :);
+%                 [ca_out, sp_out, ~, ~, ~] = foopsi_oasisAR1(center_trace, oasis_g, oasis_lambda, false,...
+%                  true, 1, 100);
+%                 neuron_trace_mat(i, :) = center_trace; 
+%                 deconvol_neuron_trace_mat(i, :) = ca_out;
+%                 spike_mat(i, :) = sp_out;     
+%             end
+%             coefs_array = [];
+%         end
+%         toc
+%         save(fullfile(curr_outdir, ['after_background_rejection.mat']),...
+%             'neuron_trace_mat', 'deconvol_neuron_trace_mat', 'spike_mat', 'coefs_array', '-v7.3');
+%         figure, temporal_trace_render(neuron_trace_mat, 'k')
+% 
+%         %% neuron trace filtering
+% %         disp('--------------------------temporal filtering--------------------------')
+% %         method = 'svm';
+% %         trace_keep_mode = 'sensitive';
+% %         positive_ind = temporal_activity_filtering(neuron_trace_mat, method, trace_keep_mode);
+% %         % update
+% %         T_filtered = neuron_trace_mat(positive_ind, :);
+% %         S_filtered = spike_mat(positive_ind, :);
+% %         T_deconv_filtered = deconvol_neuron_trace_mat(positive_ind, :);
+% %         center_array_filtered  = center_array(positive_ind, :);
+% %         seg_filtered = valid_seg(positive_ind, :);
+% % 
+% %         save(fullfile(curr_outdir, ['after_classifier_filter.mat']),...
+% %             'T_filtered', 'S_filtered', 'T_deconv_filtered', ...
+% %             'center_array_filtered', 'seg_filtered', '-v7.3');
+% 
+%         seg_filtered = valid_seg;
+%         center_array_filtered  = center_array;
+%         T_filtered = deconvol_neuron_trace_mat;
+%     %% apply patches shifts
+%         reg_center = center_array_filtered;
+%         reg_seg = seg_filtered;
+%         for k = 1 : size(seg_filtered, 1)
+%             % note each seg has multiple small patches
+%             reg_seg{k, 2}(:, 1) = seg_filtered{k, 2}(:, 1) + curr_patch_info.location(1, 1);
+%             reg_seg{k, 2}(:, 2) = seg_filtered{k, 2}(:, 2) + curr_patch_info.location(1, 2);
+%             
+%             reg_center(:, 1) = center_array_filtered(:, 1) + curr_patch_info.location(1, 1);
+%             reg_center(:, 2) = center_array_filtered(:, 2) + curr_patch_info.location(1, 2);
+%         end
+%         
+%         global_center = [global_center; reg_center];
+%         global_seg = [global_seg; reg_seg];
+%         global_trace = [global_trace; T_filtered];
+%         
+%         
+%         save(fullfile(curr_outdir, ['registered.mat']),...
+%             'reg_center', 'reg_seg', 'T_filtered', '-v7.3');
+%     else
+%         continue
+%     end
+%     
+% 
+% end
+% % save global results
+% save(fullfile(outdir, ['global_output.mat']),...
+%         'global_center', 'global_seg', 'global_trace', '-v7.3');
+% %% 3D distributions
+% figure('Name', 'video', 'position', [100, 100, 400, 300])
+% plot_3D_distribution(global_seg, [volum_size_cut(1), volum_size_cut(2)], [1, 2] * seed_param.pixel_size, ...
+%                         seed_param.per_slice_depth * recon_param.psf_layer_position, 10) 
+% savefig(sprintf('%s\\spatial_distribution_3D.fig', outdir))
+% 
+% %% final plot: 3D neuron distributions in a video
+% % with AZ changed
+% %{
+% avi_filename =[outdir, '\\spatial_video.avi'];
+% avi_file = VideoWriter(avi_filename);
+% avi_file.FrameRate = 30;
+% avi_file.Quality = 100;
+% % avi_file.CompressionRatio = 1;
+% % avi_file.VideoCompressionMethod = 'H.264';
+% avi_file.open();
+% 
+% 
+% az_angle = 1 : 720;
+% el = 19;
+% figure('Name', 'video', 'position', [100, 100, 400, 300])
+% for i = 1 : 1 : length(az_angle)
+%     clf
+% 	plot_3D_distribution(valid_seg, [volum_size(1), volum_size(2)], [1, 2] * pixel_size, ...
+%                         recon_param.psf_layer * per_slice_depth, 10) 
+% 	view(az_angle(i), el)
+%     
+% 	temp = getframe(gcf);
+% %     temp = imresize(temp.cdata, [400, 600]);
+%     avi_file.writeVideo(temp);
+%    
+% end
+% avi_file.close();   
+% %}
+% %% final plot: temporal activity
+% tmp_C = zscore(global_trace, 0, 2);
+% figure, imagesc(tmp_C)
+% pbaspect([1, 2, 1])
+% 
+% % zoom in,
+% zoom_in_neuron_id = [1000, 1100];
+% zoom_in_time = [500, 800];
+% hold on,
+% rectangle('Position', [zoom_in_time(1), zoom_in_neuron_id(1), ...
+%                 zoom_in_time(2) - zoom_in_time(1), ...
+%                 zoom_in_neuron_id(2) - zoom_in_neuron_id(1)], ...
+%                 'edgecolor', color_scheme_npg(1, :), ...
+%                 'linestyle', '--', ...
+%                 'linewidth', 1)
+% savefig(sprintf('%s\\temporal_trace_heat.fig', outdir))
+% % zoom in
+% figure('position', [1, 1, 300, 600]),
+% temporal_trace_render_simple(global_trace(zoom_in_neuron_id(1) : zoom_in_neuron_id(2), ...
+%                          zoom_in_time(1) : zoom_in_time(2)))
+% colormap('gray')
+% caxis([-2, 0])
+% axis off
+% pbaspect([1, 2, 1])
+% savefig(sprintf('%s\\temporal_trace.fig', outdir))
+% 
+% 
+% %% utility function
+% function out_mat_A = cell_process_A(A, movie_size) % would be slow since reach the limit
+%     out_mat_A = zeros(movie_size(1) * movie_size(2) * movie_size(4), size(A, 2));
+%     for i = 1 : size(A, 1) % number of component
+% %         i
+%        curr_A =  cell2mat(A(i, :));
+%        out_mat_A(:, i) = curr_A(:);
+%     end
+%     out_mat_A  = sparse(out_mat_A );
+% end
+% function A_cell = extract_A(A_mat, movie_size)
+%     A_cell = cell(size(A_mat, 1), movie_size(4));
+%     
+% 	for i = 1 : size(A_mat, 1) % number of component
+%        for j = 1 : movie_size(4) % number of view
+%           curr_A = A_mat((j - 1) * movie_size(1) * movie_size(2) + 1 : j * movie_size(1) * movie_size(2), i);
+%           A_cell{i, j} = sparse(reshape(curr_A, movie_size(1), movie_size(2)));
+%        end
+%     end
+% end
