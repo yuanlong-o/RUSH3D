@@ -108,15 +108,17 @@ plot_3D_distribution_mod_depth_irreg(valid_seg_global_bd_filt, [size_h, size_w],
 % figure, imshow(response_stack)
 % 
 % % calculate the mask
-% se = strel('disk',5);
+% se = strel('disk',1);
 % response_stack_segm= imdilate(response_stack, se);
 % response_stack_segm = response_stack_segm > 5e-2;
 % %
 % % response_stack_segm = imgaussfilt(response_stack_segm, 10);
 % figure, imshow(response_stack_segm)
 % saveastiff(im2uint16(response_stack_segm), sprintf('%s\\blood_vessel_mask.tiff', outdir));
-
-response_stack_segm  = zeros(size(img));
+% 
+% response_stack_segm  = zeros(size(img));
+response_stack_segm = img;
+saveastiff(im2uint16(response_stack_segm), sprintf('%s\\blood_vessel_mask.tiff', outdir));
 %% grab the center and spatial footprint in the central view stack
 
 exclude_ind = 0;

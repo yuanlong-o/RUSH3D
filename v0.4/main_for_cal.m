@@ -59,7 +59,7 @@ preprocess_param.num_rawdata = 2000;
 
 
 %% Parameter setting
-estimate_patch_size = 300;
+estimate_patch_size = 400;
 %% Realign parameter
 preprocess_param.Nnum = 15; % 15 x 15 pixels behind each microlen. This parameter do not have to change.  
 preprocess_param.Nshift = 3; % scanning for Nshift x Nshift times (all choices: 3: 3 x 3; 5: 5 x 5; 13: 13 x 13)
@@ -132,7 +132,7 @@ recon_param.side = 50;
 % this three parameter is not used in reconstruction but use in calcium extraction
 recon_param.pixel_size = 4.6e-6/5.761*recon_param.ds; 
 recon_param.per_slice_depth = 10e-6; % depth
-recon_param.estimate_patch_size = 500;
+recon_param.estimate_patch_size = estimate_patch_size;
 %% View configuration
 view_array = view_config(preprocess_param);
 preprocess_param.view_array = view_array;
@@ -147,6 +147,7 @@ preprocess_param.view_array = view_array;
 % end
 % saveastiff(uint16(std_vi),'D:\RUSH3Dproject\RUSH3Dresult\0622\rasai148d_1_z287\test2\std_rasai148d_1_z287_3x3_45.0ms_Full_Hardware_LaserCount1_2106221446340.tif');
 std_WDF = loadtiff(sprintf('%s\\std_rasai148d_1_z287_3x3_45.0ms_Full_Hardware_LaserCount1_2106221446340.tif',outdir));
+first_wdf = double(loadtiff(sprintf('%s\\realign\\realign_rasai148d_1_z287_3x3_45.0ms_Full_Hardware_LaserCount1_210622144634_No0.tif',outdir)));
 savegroup = 2;
 std_volume = loadtiff(sprintf('%s\\std_recon_seperate\\whole_patch.tiff',outdir));
 %%
@@ -168,8 +169,8 @@ recon_param.patch_side = ceil(recon_param.side *  recon_param.upsampling);
 recon_param.patchnum = recon_param.patchx * recon_param.patchy;
 
 % only reconstruct one frame
-frame = 0;
-wdf_size = size(std_WDF);
+% frame = 0;
+% wdf_size = size(std_WDF);
 % % separate whole WDF into small patch with overlap
 % index_id_x = round(linspace(recon_param.side+1,wdf_size(1)+1-recon_param.side,recon_param.patchx+1));
 % index_id_y = round(linspace(recon_param.side+1,wdf_size(2)+1-recon_param.side,recon_param.patchy+1));
@@ -232,8 +233,9 @@ wdf_size = size(std_WDF);
 % imwriteTFSK(uint16(std_volume/max(std_volume(:))*65535),strcat(std_recon_savepath,'\\','whole_patch.tiff'));
 std_volume = double(std_volume);
 std_volume = std_volume  / max(std_volume(:));
+first_wdf = double(first_wdf);
+first_wdf = first_wdf / max(first_wdf(:));
 %% start processing patch
-
 NN_ds = preprocess_param.Nnum / preprocess_param.Nshift;
 % ------------------------z range-------------------------------
 z_energy = squeeze(mean(mean(std_volume,1),2));
@@ -243,7 +245,6 @@ end_ind = 69;
 std_volume_cut = std_volume(:, :, start_ind : end_ind);
 std_volume_cut = std_volume_cut / max(std_volume_cut(:));
 volum_size_cut = [size(std_volume_cut, 1), size(std_volume_cut, 2), size(std_volume_cut, 3)];
-
 
 % --------------------segmentation parameters--------------------
 seed_param.outdir = outdir;
@@ -256,7 +257,7 @@ seed_param.wdf_ds = recon_param.ds;
 seed_param.vol_ds = recon_param.ds;
 seed_param.neuron_number = 150;
 seed_param.neuron_lateral_size = 8;
-seed_param.local_constrast_th = 1.3;
+seed_param.local_constrast_th = 1.9;
 seed_param.optical_psf_ratio = seed_param.per_slice_depth / seed_param.pixel_size;
 seed_param.overlap_ratio = 0.5;
 seed_param.boundary_thickness = 2; % for plot
@@ -268,7 +269,7 @@ shell_radius = ceil(2* seed_param.neuron_lateral_size);
 
 % --------------------iteration related--------------------
 bg_iter=10;
-max_demixing_round = 5;
+max_demixing_round = 3;
 maxIter_NMF = 10;
 
 global_center = [];
@@ -280,15 +281,20 @@ oasis_lambda = 0.02;
 oasis_g = 0.9;
 lambda_l0 = 0.01;
 frames_step = 1;
-
+%% vessel segmentation
+cv_wdf = squeeze(first_wdf(:,:,ceil(size(first_wdf,3)/2)));
+response_stack_segm = vessel_segmentation(cv_wdf, outdir);
+response_stack_segm = response_stack_segm(recon_param.side+1:end-recon_param.side,recon_param.side+1:end-recon_param.side);
+response_stack_segm_ds = imresize(response_stack_segm,1/seed_param.wdf_ds);
+%% patch preparation
 % --------------------patch preparation--------------------
 
-wdf_cut_side = std_WDF(recon_param.side+1:end-recon_param.side,recon_param.side+1:end-recon_param.side,:);
+wdf_cut_side = first_wdf(recon_param.side+1:end-recon_param.side,recon_param.side+1:end-recon_param.side,:);
 wdf_cut_side_ds = imresize(wdf_cut_side,1/seed_param.wdf_ds);
 [patch_info_array] = determine_patch_size_LFM(size(std_volume, 1), size(std_volume, 2),...
                     size(wdf_cut_side_ds,1), size(wdf_cut_side_ds, 2), seed_param);
 %%
-for global_patch_id = 1 : 54 % for lateral patches
+for global_patch_id = 1 :1: 20 % for lateral patches
     
     fprintf('patch %d\n', global_patch_id);
     curr_outdir = sprintf('%s\\patch_%d', outdir, global_patch_id);
@@ -299,9 +305,10 @@ for global_patch_id = 1 : 54 % for lateral patches
         curr_patch_info.location(1, 2) : curr_patch_info.location(2, 2), ...
         :);
     patch_volum_size_cut = [size(patch_volume, 1), size(patch_volume, 2), size(patch_volume, 3)];
-    patch_WDF = wdf_cut_side_ds(curr_patch_info.wdf_loc(1, 1) : curr_patch_info.wdf_loc(2, 1), ...
+    
+    patch_vessel_seg = response_stack_segm_ds(curr_patch_info.wdf_loc(1, 1) : curr_patch_info.wdf_loc(2, 1), ...
         curr_patch_info.wdf_loc(1, 2) : curr_patch_info.wdf_loc(2, 2), :);
-    patch_wdf_size_cut = [size(patch_WDF,1),size(patch_WDF,2)];
+    patch_wdf_size_cut = [size(patch_vessel_seg,1),size(patch_vessel_seg,2)];
     %% neuron segmentation generation module
     % ~ 2h
 	center_array = [];
@@ -310,9 +317,7 @@ for global_patch_id = 1 : 54 % for lateral patches
     curr_seed_param = seed_param;
     curr_seed_param.outdir = curr_outdir;
 
-    valid_seg = segmentation_module(patch_volume, ...
-                                    squeeze(patch_WDF(:, :, ceil(length(view_array)/2))), ...
-                                    curr_seed_param);
+    valid_seg = segmentation_module(patch_volume, patch_vessel_seg, curr_seed_param);
                                 %%
     % determine if it is an empty patch
     if find(~cellfun(@isempty,valid_seg))
