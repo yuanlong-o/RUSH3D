@@ -1,0 +1,203 @@
+function [] = realign_module(preprocess_param, rawdata_name, realigndata_name_perfix)
+%% Realign Module Realign sLF data
+% This program is used to realign scanning light field data (raw or std),
+% this is programmed by c++, and command will losd the stack frame by frame
+% in one video, it will save the file automatically with the suffix:
+% _No0(1,2,....group_count).tif
+
+% Last update: 05/15/2021. MW
+% Last update: 05/15/2021. YZ
+
+
+% Input: 
+% preprocess_param            realign parameter
+% rawdata_name                name of first file
+% realigndata_name_perfix     perfix name of output realigned file
+
+% Output:
+% summary_image               first group of stack (M x M x Nnum x Nnum)
+% output file                 all groups of realigned data (each file: M x M x Nnum^2)
+%                             in std, only one group, and return in function directly
+% The file with the suffix: _No0(1,2,....group_count).tif
+                  
+
+Nnum = preprocess_param.Nnum; % 15 x 15 pixels behind each microlen. This parameter do not have to change.  
+Nshift = preprocess_param.Nshift; % scanning for Nshift x Nshift times (all choices: 3: 3 x 3; 5: 5 x 5; 13: 13 x 13)
+
+start_frame = preprocess_param.start_frame; % the number of start frame (the first number is 0, from 0 to N-1)
+frame_interval = preprocess_param.frame_interval; % interval of frame (1 by default: process frame by frame, no jump frame)
+upsampling_resize = preprocess_param.upsampling_resize;% 1 means resize WDF to 13 x 13, otherwise 0; (has a problem !!!!!)
+
+
+auto_center_mode = preprocess_param.auto_center_mode; % find the center coordinate of x and y automatically when it is 1 and it will disable center_X and center_Y, otherwise 0
+auto_center_frame = preprocess_param.auto_center_frame ; % use auto_center_frame to find center automatically under the auto center mode, take the first frame (0 in c++) by default  
+center_X = preprocess_param.center_X; % the center coordinate x of Light field data (Note that the coordinate is from 0 to N-1 in c++)
+center_Y = preprocess_param.center_Y; % the center coordinate y of Light field data (Note that the coordinate is from 0 to N-1 in c++)
+Nx = preprocess_param.Nx; % take half number of microlens in x direction (total number: Nx * 2 + 1)
+Ny = preprocess_param.Ny; % take half number of microlens in y direction (total number: Nx * 2 + 1) ( Nx = Ny is strongly recommended) (has a problem !!!!!)
+
+conf_name = preprocess_param.conf_name; % configuration file for scanning which is corresponding to Nshift
+
+group_mode = preprocess_param.group_mode; % Mode of realign between different frame of rawdata. 0: jump mode (group1: 1-9, group2: 10-18,...); 1: slide window(group1: 1-9, group2: 2-10,...)
+valid_frame_num = preprocess_param.valid_frame_num; % the number of realigned WDF stacks
+
+
+realign_mode = preprocess_param.realign_mode; % realignMode for different scanning sequence (all choices: 'LZ': light path scanning (in RUSH3D). 'ZGX': stage scanning in the opposite direction from 'LZ')
+centerview = preprocess_param.centerview; % file name of centerview in the same output directory. (If centerview is not needed, use 'None'. If we need centerview only, use *.only.tiff)
+
+rotation = preprocess_param.rotation; % rotate raw data clockwise (all choice: 0, 90, 180, 270)
+slight_resize = preprocess_param.slight_resize; % slight resize raw data in realign function (1 by default)
+slight_rotation = preprocess_param.slight_rotation; % slight rotate raw data in realign function (0 by default) Note that we do not recommend resize and rotate in realign module.
+
+if(auto_center_mode == 1) % It is not recommended
+    img = double(imread(rawdata_name, auto_center_frame + 1)); % note imread only read the top image of a stack
+    [center_X, center_Y, ~] = AutoCenter(img, Nnum);
+end
+
+bsn = preprocess_param.bright_scale_normalize; % 1 for normalizing bright scale for each scanning period (for lym) 0 no;
+szf = preprocess_param.skip_zero_frame; % 1 for skip zero frame, 0 no;
+%% main realign command
+command = sprintf('ReAlign %d %s %s %d %d %d %d %d %d %s %d %d %d %d %s %s %d %f %f %d %d',...
+    Nshift, realigndata_name_perfix, rawdata_name, start_frame, center_X, center_Y, Nx,...
+    valid_frame_num, group_mode, conf_name, frame_interval, upsampling_resize, Nnum, Ny, ...
+    realign_mode, centerview, rotation, slight_resize, slight_rotation, bsn, szf);
+
+system(command);
+
+% load first group of realigned wdf
+
+
+end
+
+
+%% utility function
+function [Xcenter,Ycenter, prob] = AutoCenter(img, Nnum)
+
+SUB_NUM = 3; % n
+SUB_MAX_RANGE_RATIO = 5; % k
+MAX_AREA_TRUST_RATIO = 4; % m
+img = double(img);
+fullX = size(img, 2);
+fullY = size(img, 1);
+
+ansList = zeros(1 + MAX_AREA_TRUST_RATIO + SUB_NUM*SUB_NUM, 3);
+fprintf('Full Image :');
+[ansList(1,1), ansList(1,2), ansList(1,3)] = AutoCenterSub(img, Nnum, 0, 0);
+fprintf('\n');
+maxImg = max(img(:));
+[maxPosY, maxPosX] = find(img == maxImg);
+maxPosX = maxPosX(round(size(maxPosX, 1) / 2));
+maxPosY = maxPosY(round(size(maxPosY, 1) / 2));
+
+rangeSX = round(maxPosX - fullX / SUB_MAX_RANGE_RATIO);
+if(rangeSX < 1) rangeSX = 1; end
+rangeEX = round(maxPosX + fullX / SUB_MAX_RANGE_RATIO);
+if(rangeEX > fullX) rangeEX = fullX; end
+
+rangeSY = round(maxPosY - fullY / SUB_MAX_RANGE_RATIO);
+if(rangeSY < 1) rangeSY = 1; end
+rangeEY = round(maxPosY + fullY / SUB_MAX_RANGE_RATIO);
+if(rangeEY > fullY) rangeEY = fullY; end
+fprintf('Lightest x%d:', MAX_AREA_TRUST_RATIO);
+[ansList(2,1), ansList(2,2), ansList(2,3)] = ...
+    AutoCenterSub(img(rangeSY : rangeEY, rangeSX : rangeEX), Nnum, rangeSX - 1, rangeSY - 1);
+fprintf('\n');
+ansList(2:2+MAX_AREA_TRUST_RATIO-1, :) = repmat(ansList(2,:), [MAX_AREA_TRUST_RATIO, 1]);
+
+anchorPtX = zeros(SUB_NUM+1, 1);
+for i = 0:SUB_NUM
+    anchorX = round(1 + i * fullX/SUB_NUM);
+    if(anchorX > fullX) anchorX = fullX; end
+    anchorPtX(i+1) = anchorX;
+end
+anchorPtY = zeros(SUB_NUM+1, 1);
+for i = 0:SUB_NUM
+    anchorY = round(1 + i * fullY/SUB_NUM);
+    if(anchorY > fullY) anchorY = fullY; end
+    anchorPtY(i+1) = anchorY;
+end
+
+idx = 1 + MAX_AREA_TRUST_RATIO + 1;
+
+for i = 1:SUB_NUM % x
+    for j = 1:SUB_NUM % y
+        fprintf('Sub X=%d Y=%d:', i,j);
+        [ansList(idx,1), ansList(idx,2), ansList(idx,3)] = ...
+            AutoCenterSub(img(anchorPtY(j) : anchorPtY(j+1), anchorPtX(i) : anchorPtX(i+1)), Nnum, anchorPtX(i) - 1, anchorPtY(j) - 1);
+        distance = sqrt((i - ((SUB_NUM + 1) /2))^2 + (j - ((SUB_NUM + 1) /2))^2);
+        prob_loss = 1 - (distance / SUB_NUM);
+        fprintf('prob loss ratio = %.2f\n',  prob_loss);
+        ansList(idx,3) = ansList(idx,3) * prob_loss;
+        idx = idx + 1;
+    end
+end
+savedAnsList = ansList;
+ansList(:,3) = ansList(:,3) / sum(ansList(:,3));
+ansList(:,1) = ansList(:,1) .* ansList(:,3);
+ansList(:,2) = ansList(:,2) .* ansList(:,3);
+myAns = round([sum(ansList(:,1)), sum(ansList(:,2))]);
+prob = 0;
+probCount = 0;
+for i = 1:size(savedAnsList, 1)
+    if(myAns == savedAnsList(i, 1:2))
+        probCount = probCount + 1;
+        prob = prob + savedAnsList(i, 3);
+    end
+end
+if(probCount ~= 0)
+    prob = prob / probCount;
+end
+Xcenter = myAns(1) + floor(size(img,2) / Nnum / 2) * Nnum;
+Ycenter = myAns(2) + floor(size(img,1) / Nnum / 2) * Nnum;
+fprintf('AutoCenter found x = %d, y = %d (range from 0~[size-1]), credibility = %.2f%%, check at ImageJ\n', Xcenter, Ycenter, prob*100);
+end
+
+
+function [Xcenter, Ycenter, prob] = AutoCenterSub(img, Nnum, x_offset, y_offset)
+
+BEST_RATIO = 0.3;
+WORST_RATIO = 0.9;
+
+img = double(img);
+img = img ./ max(img(:));
+img = img.^2;
+kernal = fspecial('gaussian',[Nnum,Nnum],3);
+img = imfilter(img, kernal);
+locMatrix = zeros(Nnum, Nnum);
+for i = 1:Nnum
+    for j = 1:Nnum
+        picMat = img(i:Nnum:end, j:Nnum:end);
+
+        avg = mean(mean(picMat));
+        picMat(picMat < avg) = 0;
+        hugePos = find(picMat ~= 0);
+        locMatrix(i,j) = sum(picMat(:)) / size(hugePos, 1);
+    end
+end
+
+sumX = sum(locMatrix);
+sumY = sum(locMatrix,2);
+sumX = sumX + circshift(sumX, 1, 2);
+sumY = sumY + circshift(sumY, 1, 1);
+darkX = 1;
+for i = 1:Nnum
+    if(sumX(i) < sumX(darkX))
+        darkX = i;
+    end
+end
+darkY = 1;
+for i = 1:Nnum
+    if(sumY(i) < sumY(darkY))
+        darkY = i;
+    end
+end
+Xcenter = mod(darkX + floor(Nnum / 2) - 1 + x_offset, Nnum);
+Ycenter = mod(darkY + floor(Nnum / 2) - 1 + y_offset, Nnum);
+prob = (WORST_RATIO - min(min(locMatrix)) / max(max(locMatrix))) / (WORST_RATIO - BEST_RATIO);
+if(prob > 1)
+    prob = 1;
+elseif(prob < 0)
+    prob = 0;
+end
+fprintf('AutoCenterSub x = %d, y = %d, prob = %f ', Xcenter, Ycenter, prob);
+end

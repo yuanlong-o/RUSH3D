@@ -1,0 +1,24 @@
+@echo off
+
+REM enable local change
+setlocal EnableDelayedExpansion
+
+
+
+REM file counter for debugging
+set /a cnt=0
+
+REM file path
+set "file_path=D:\YZ\\Project ec analysis\\output\\20210928xiaoguihuaai148dNo610-1 go no-go mice 610 before traing day 6-1_d4"
+set "file_prefix=\\sCNMFE_config_"
+set "file_extension=*.mat"
+
+REM set up search pattern
+set "file_search_pattern=%file_path%%file_prefix%%file_extension%"
+
+REM echo %file_path%
+REM echo Config file is in %file_search_pattern%
+echo %file_path%
+pause
+
+

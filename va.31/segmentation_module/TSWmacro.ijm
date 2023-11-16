@@ -1,0 +1,10 @@
+run("Trainable Weka Segmentation");
+wait(3000);
+selectWindow("Trainable Weka Segmentation v3.2.33");
+call("trainableSegmentation.Weka_Segmentation.loadClassifier", "D:\\RUSH3Dpipeline\\va.2\\segmentation_module\\classifier20220302_4.model");
+call("trainableSegmentation.Weka_Segmentation.getResult");
+selectWindow("Classified image");
+selectWindow("Trainable Weka Segmentation v3.2.33");
+call("trainableSegmentation.Weka_Segmentation.getProbability");
+selectWindow("Probability maps");
+close("Trainable Weka Segmentation*");
