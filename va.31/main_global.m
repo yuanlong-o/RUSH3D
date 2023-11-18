@@ -1,7 +1,7 @@
 clc;clear;
 close all;
 
-%% this file is the main file for the meso-sLFM calcium data processing.
+%% this file is the main file for the RUSH3D calcium data processing.
 %  this pipeline contains from reading to calcium sensing.
 %  patched version, for the sake of processing memory and also processing
 %  speed.
@@ -9,7 +9,6 @@ close all;
 %  enabled.
 
 
-%  last update: 10/19/2021. MW
 %  last update: 6/29/2021. MW
 %  last update: 6/5/2021. YZ
 %  last update: 5/23/2021. MW
@@ -29,13 +28,13 @@ addpath(genpath('utility'));
 %% file path definition
 
 % output dir
-main_param.outdir = 'Z:\KC\RUSH3DRESULT\20230706_ai148_28_10Hz_2';
+main_param.outdir = '..\RUSH3Dresult\1';
 % rawdata dir and file name
-main_param.rawdata_path = 'Z:\KC\rawdata\20230706\20230706_ai148_28_10Hz_2'; % raw data path (before rotate, resize and rotate);
-main_param.first_file_name = '20230706_ai148_06_10Hz_3x3_80.0ms_Full_Hardware_LaserCount1_230706223416'; % in one video or one capture, the name of first stack
+main_param.rawdata_path = '..\RUSH3Drawdata'; % raw data path (before rotate, resize and rotate);
+main_param.first_file_name = 'Rasgrf-Ai148D_1_whiskerstim_3_3x3_50.0ms_Full_Hardware_LaserCount1_211021181554'; % in one video or one capture, the name of first stack
 main_param.Nnum = 15;
 main_param.Nshift = 3;
-main_param.num_rawdata = 7600;
+main_param.num_rawdata = 800;
 main_param.view_range = 5;
 main_param.overlap = 21;
 main_param.patch_block = [3,4];
@@ -57,8 +56,8 @@ realign_param.center_Y = 3001; % the center coordinate y of Light field data (No
 realign_param.Nx = 260; % take half number of microlens in x direction (total number: Nx * 2 + 1)
 realign_param.Ny = 193; % take half number of microlens in y direction (total number: Nx * 2 + 1)
 realign_param.group_mode = 0; % Mode of realign between different frame of rawdata. 0: jump mode (group1: 1-9, group2: 10-18,...); 1: slide window(group1: 1-9, group2: 2-10,...)
-realign_param.slight_resize = 0.9987; % slight resize raw data in realign function (1 by default)
-realign_param.slight_rotation =  -0.0191; % slight rotate raw data in realign function (0 by default) Note that we do not recommend resize and rotate in realign module.
+realign_param.slight_resize = 0.9991; % slight resize raw data in realign function (1 by default)
+realign_param.slight_rotation =  0; % slight rotate raw data in realign function (0 by default) Note that we do not recommend resize and rotate in realign module.
 realign_param.rotation =  0; % rotate raw data clockwise (all choice: 0, 90, 180, 270)
 realign_param.upsampling_resize = 0; % 1 means resize WDF to 1 * 1, otherwise no resize; 
 realign_param.realign_mode = 'LZ'; % realignMode for different scanning sequence (all choices: 'LZ': light path scanning (in RUSH3D). 'ZGX': stage scanning in the opposite direction from 'LZ')
