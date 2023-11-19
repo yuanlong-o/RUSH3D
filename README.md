@@ -20,6 +20,7 @@ Please submit any issues or questions to this repository's [issue tracker](https
 
 ## Usage
 * See comments in parameter setting script for documentation of required and optional arguments
+* First, run the file `main_global.m` This file is used to convert the light-field rawdata to different view images (pixel realign) and divided the whole FOV into several blocks.
+* Second, run the `main_patch.bat`.
 * In general, to run the RUSH3D pipeline, pass at least the required arguments to the main function.   
-* Parameter `indir` should point to a folder containing a series of .tif files containing one frame of raw data each. Files will be read in in alphabetic order.
 * Replace `<psfdir>` with the path to the directory containing the PSF file.
