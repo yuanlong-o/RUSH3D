@@ -20,7 +20,9 @@ Please submit any issues or questions to this repository's [issue tracker](https
 
 ## Usage
 * See comments in parameter setting script for documentation of required and optional arguments
-* First, run the file `main_global.m` This file is used to convert the light-field rawdata to different view images (pixel realign) and divided the whole FOV into several blocks.
-* Second, run the `main_patch.bat`.
-* In general, to run the RUSH3D pipeline, pass at least the required arguments to the main function.   
 * Replace `<psfdir>` with the path to the directory containing the PSF file.
+* First, run the file `main_global.m` This file is used to convert the light-field rawdata to different view images (pixel realign) and divided the whole FOV into several blocks.
+* Second, run the `main_patch.bat`. This batch file will open several matlab scripts one by one and run automatically, processing corresponding patches to extract neuron signal.
+* Finally, run the `collect_all_trace.m`. This batch is used to concatenate all neurons information from different patches, providing a global result.
+
+
