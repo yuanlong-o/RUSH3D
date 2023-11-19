@@ -19,9 +19,11 @@ Please submit any issues or questions to this repository's [issue tracker](https
 
 
 ## Usage
-* See comments in parameter setting script for documentation of required and optional arguments
-* Replace `<psfdir>` with the path to the directory containing the PSF file.
+* You can download the raw data and system PSF from: https://drive.google.com/drive/folders/1Vu0NbfKpJaAzkTZOIb1kqtKEy2WZWVjL (120 frames and PSF from 12 ROIs).
+* See comments in parameter setting script for documentation of required and optional arguments.
 * First, run the file `main_global.m` This file is used to convert the light-field rawdata to different view images (pixel realign) and divided the whole FOV into several blocks.
+  * Make sure the centerX and centerY (coordinate of center pixel of center microlens of whole FOV).
+  * Put the raw data and PSF in correct dir. 
 * Second, run the `main_patch.bat`. This batch file will open several matlab scripts one by one and run automatically, processing corresponding patches to extract neuron signal.
 * Finally, run the `collect_all_trace.m`. This batch is used to concatenate all neurons information from different patches, providing a global result.
 
