@@ -1,19 +1,14 @@
 clc;clear;
 close all;
 
-%% this file is the main file for the RUSH3D calcium data processing.
-%  this pipeline contains from reading to calcium sensing.
-%  patched version, for the sake of processing memory and also processing
-%  speed.
-%  registration module is inserted  after realignment. Dynamic memory calcualtion
-%  enabled.
+%% This file is the main file for the RUSH3D realign pixel, turning the rawdata to different view data.
+%  Read data, turn to different views (realign) and divided into patches.
 
 
 %  last update: 6/29/2021. MW
 %  last update: 6/5/2021. YZ
 %  last update: 5/23/2021. MW
 %  last update: 1/11/2022. MW
-
 
 %% Path 
 % addpath
@@ -28,17 +23,24 @@ addpath(genpath('utility'));
 %% file path definition
 
 % output dir
-main_param.outdir = '..\RUSH3Dresult\1';
+main_param.outdir = 'D:\RUSH3D\RUSH3Dresult\2';
 % rawdata dir and file name
-main_param.rawdata_path = '..\RUSH3Drawdata'; % raw data path (before rotate, resize and rotate);
+main_param.rawdata_path = 'D:\RUSH3D\RUSH3Drawdata\2'; 
 main_param.first_file_name = 'Rasgrf-Ai148D_1_whiskerstim_3_3x3_50.0ms_Full_Hardware_LaserCount1_211021181554'; % in one video or one capture, the name of first stack
 main_param.Nnum = 15;
 main_param.Nshift = 3;
-main_param.num_rawdata = 800;
+main_param.num_rawdata = 120;
 main_param.view_range = 5;
 main_param.overlap = 21;
 main_param.patch_block = [3,4];
 main_param.side = [0,15,0,0];
+
+% ----------------- PSF path --------------------
+psf_param.correction = 1;
+psf_param.debg_psfpath = 'D:\RUSH3D\RUSH3Dpsf\5.761x_axial_-1000um_to_1000um_zstep_20_NA_0.5um_fml_393.3um_ftl_265mm_OSR_5_ds_30\psf_zmat';
+psf_param.recon_psfpath = 'D:\RUSH3D\RUSH3Dpsf\5.761x_axial_-300um_to_300um_zstep_6_NA_0.5um_fml_393.3um_ftl_265mm_OSR_5_ds_3\psf_zmat';
+psf_param.reconpsf_perfix = 'D:\RUSH3D\RUSH3Dpsf';
+psf_param.reconpsf_surfix = '_5.761x_lambda_525_axial_-400um_to_400um_zstep_8_NA_0.5_fml_393.3um_OSR_5_ds_3\psf_zmat';
 %%
 mkdir(main_param.outdir);
 rawdata_path = main_param.rawdata_path;
@@ -46,7 +48,7 @@ first_file_name = main_param.first_file_name;
 input_rawdata_perfix = [rawdata_path, '\\', first_file_name]; % the first file in one capture
 view_array = view_config(main_param);
 %% Realign parameter
-realign_param.num_rawdata = 7600;
+realign_param.num_rawdata = 120;
 realign_param.start_frame = 0; % the number of start frame (the first number is 0, from 0 to N-1)
 realign_param.frame_interval = 1; % interval of frame (1 by default: process frame by frame, no jump frame)
 realign_param.auto_center_mode = 0; % find the center coordinate of x and y automatically when it is 1 and it will disable center_X and center_Y, otherwise 0
@@ -96,7 +98,7 @@ realign_param.centerview = strcat(realigndata_name_perfix,'_cv.tiff');
 
 % start realign
 tic;
-%realign_module(realign_param, input_rawdata_name, realigndata_name_perfix);
+realign_module(realign_param, input_rawdata_name, realigndata_name_perfix);
 t_realign = toc;
 fprintf('Realign process done and it takes %.2f secs\n',t_realign);
 
@@ -142,7 +144,7 @@ video_realign_param.centerview = 'None';
 
 % start realign
 tic;
-%realign_module(video_realign_param, input_rawdata_name, video_realign_name_perfix);
+realign_module(video_realign_param, input_rawdata_name, video_realign_name_perfix);
 t_video_realign = toc;
 fprintf('video realign process done and it takes %.2f secs\n',t_video_realign);
 
@@ -206,7 +208,7 @@ recon_param.margin = 9; % margin overlap
 recon_param.patchx = 2;
 recon_param.patchy = 2;
 % --------------------segmentation parameters--------------------
-seed_param.pixel_size = 4.6e-6/4.561*recon_param.ds; % this three parameter is not used in reconstruction but use in calcium extraction
+seed_param.pixel_size = 4.6e-6/5.7*recon_param.ds; % this three parameter is not used in reconstruction but use in calcium extraction
 seed_param.per_slice_depth = 8e-6; % depth
 seed_param.estimate_patch_size = 250;
 seed_param.mask3D = 0;
@@ -220,6 +222,7 @@ seed_param.start_ind = 40;
 seed_param.end_ind = 93;
 seed_param.max_value = 2000;
 seed_param.min_value = 50;
+seed_param.vessel_mask = 0;
 % --------------------iteration related--------------------
 demix_param.bg_iter = 10;
 demix_param.max_demixing_round = 3;
@@ -236,12 +239,6 @@ viddebg_param.maxframe = 1000;
 vidreg_param = reg_param;
 vidreg_param.reg_bin_width = 80;
 vidreg_param.CoreNum_view = 4;
-% ----------------- PSF path --------------------
-psf_param.correction = 1;
-psf_param.debg_psfpath = 'D:\RUSH3Dproject\RUSH3Dpsf\5.6509x_axial_-1000um_to_1000um_zstep_20_NA_0.5um_fml_393.3um_ftl_265mm_OSR_5_ds_30\psf_zmat';
-psf_param.recon_psfpath = 'D:\RUSH3Dproject\RUSH3Dpsf\5.6509x_axial_-300um_to_300um_zstep_6_NA_0.5um_fml_393.3um_ftl_265mm_OSR_5_ds_3\psf_zmat';
-psf_param.reconpsf_perfix = 'D:\RUSH3Dproject\RUSH3Dpsfblock\20211115';
-psf_param.reconpsf_surfix = '_4.561x_lambda_525_axial_-400um_to_400um_zstep_8_NA_0.4_fml_393.3um_OSR_5_ds_3\psf_zmat';
 %% save parameters
 realign_param.realigndata_name_perfix = realigndata_name_perfix;
 video_realign_param.realigndata_name_perfix = video_realign_name_perfix;

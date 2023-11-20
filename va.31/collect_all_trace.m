@@ -9,7 +9,7 @@ bx = 3;
 by = 4;
 
 % file path
-filepath = 'E:\20230314_64';
+filepath = 'D:\RUSH3D\RUSH3Dresult\2';
 load(sprintf('%s\\patch_info.mat',filepath),'patch_info_array');
 load(sprintf('%s\\param_main.mat',filepath),'main_param', 'realign_param', 'video_realign_param', 'recon_param','seed_param');
 

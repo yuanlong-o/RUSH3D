@@ -1,8 +1,7 @@
 clc;clear;
 close all;
 
-%% this file is the main file for the meso-sLFM calcium data processing.
-%  this pipeline contains from reading to calcium sensing.
+%% this file is the main file for the RUSH3D calcium data processing.
 %  patched version, for the sake of processing memory and also processing
 %  speed.
 %  registration module is inserted  after realignment. Dynamic memory calcualtion
@@ -551,7 +550,19 @@ fprintf('resgistration process done and it takes %.2f secs\n',t_vidreg);
 load(sprintf('%s\\param_main.mat',outdir),'main_param', 'seed_param','realign_param','video_realign_param');
 load(sprintf('%s\\param_recon.mat',outdir_p), 'recon_param');
 % load mask
-vessel_mask = loadtiff(sprintf('%s\\vessel_mask.tif',outdir_p));
+if seed_param.vessel_mask == 0
+    vessel_mask = zeros(recon_param.vsize(1),recon_param.vsize(2));
+else
+    vessel_mask = loadtiff(sprintf('%s\\vessel_mask.tif',outdir_p));
+    if seed_param.mask3D == 0
+        vessel_mask = vessel_mask(:,:,1);
+    else
+        vessel_mask = vessel_mask(:,:,1 : 2: end);
+    end
+    
+    vessel_mask(vessel_mask < P_th) = 0;
+    vessel_mask(vessel_mask >= P_th) = 1;
+end
 
 seed_param.outdir = outdir_p;
 seed_param.Nnum = main_param.Nnum;
@@ -580,8 +591,8 @@ std_volume = double(std_volume);
 std_volume_ori = double(std_volume_ori);
 
 seed_param = zrange_def(std_volume,seed_param);
-start_ind = 30; % can be manully changed
-end_ind = 78;
+start_ind = 34; % can be manully changed
+end_ind = 76;
 P_th = 0.48;
 seed_param.start_ind = start_ind;
 seed_param.end_ind = end_ind;
@@ -595,14 +606,6 @@ seed_param.min_value = min_value;
 std_volume = max(min(std_volume, max_value)-min_value, 0);
 std_volume_ori = max(min(std_volume_ori, max_value)-min_value, 0);
 
-if seed_param.mask3D == 0
-    vessel_mask = vessel_mask(:,:,1);
-else
-    vessel_mask = vessel_mask(:,:,1 : 2: end);
-end
-
-vessel_mask(vessel_mask < P_th) = 0;
-vessel_mask(vessel_mask >= P_th) = 1;
 
 std_volume_cut = std_volume(:, :, start_ind : end_ind);
 std_volume_cut = std_volume_cut / max(std_volume_cut(:));
@@ -663,7 +666,7 @@ for global_patch_id = 1 : length(subpatch_info_array)% for lateral patches
         continue
     end
 end
-saveastiff(uint16(vessel_mask),sprintf('%s\\vessel_mask01.tiff',outdir_p));
+% saveastiff(uint16(vessel_mask),sprintf('%s\\vessel_mask01.tiff',outdir_p));
 save(sprintf('%s\\param_seed.mat',outdir_p),'seed_param','-v7.3');
 %% CNMFE solve trace
 load(sprintf('%s\\param_main.mat',outdir),'main_param', 'psf_param','realign_param', 'video_realign_param','demix_param');
