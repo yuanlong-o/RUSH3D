@@ -20,11 +20,13 @@ Please submit any issues or questions to this repository's [issue tracker](https
 
 ## Usage
 * You can download the raw data and system PSF from: https://drive.google.com/drive/folders/1Vu0NbfKpJaAzkTZOIb1kqtKEy2WZWVjL (120 frames and PSF from 12 ROIs).
-* See comments in parameter setting script for documentation of required and optional arguments.
 * First, run the file `main_global.m` This file is used to convert the light-field rawdata to different view images (pixel realign) and divided the whole FOV into several blocks.
-  * Make sure the centerX and centerY (coordinate of center pixel of center microlens of whole FOV).
+  * Make sure the `centerX` and `centerY` (coordinate of center pixel of center microlens of whole FOV) and other parameters correct.
   * Put the raw data and PSF in correct dir. 
-* Second, run the `main_patch.bat`. This batch file will open several matlab scripts one by one and run automatically, processing corresponding patches to extract neuron signal.
-* Finally, run the `collect_all_trace.m`. This batch is used to concatenate all neurons information from different patches, providing a global result.
+* Second, run the `main_patch.bat`. This batch file will open several matlab scripts one by one and run automatically, processing corresponding patches to extract neuron signal. Three questions need to be answered:
+  * dir of cod file. eg: `D:\RUSH3D\va.31`.
+  * patch(es) need(s) to be processed. You have to follow the form, eg: `(1,2,3)`. Your input must start with `(` and end with `)`, and use `,` as delimiters.
+  * delay time (s). A `.m` process will start to run after an excat delay time to avoid confict of memory or other computational resources. eg: `200`. Over 200 is recommended.
+* Finally, run the `collect_all_trace.m` after set the result file directory above as `filepath`. This batch is used to concatenate all neurons information from different patches, providing a global result.
 
 
