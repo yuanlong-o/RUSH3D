@@ -16,6 +16,7 @@ Please submit any issues or questions to this repository's [issue tracker](https
   * RAM should be about twice the size of the raw data in one patch. 
   * Matlab-compatible Nvidia GPU (see https://www.mathworks.com/help/parallel-computing/gpu-support-by-release.html], >~ 10 GB GPU-RAM recommended
   * Tested on a workstation with two Intel Xeon Gold 6136 CPUs (12 cores each), 512 GB RAM, 4 TB NVMe flash disk, three Nvidia Titan V GPUs with 12 GB GPU-RAM each
+  * Mechanical design files of scanning light-field sensor (see `camera mechanical design-upload`)
 
 
 ## Usage
